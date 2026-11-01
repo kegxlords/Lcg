@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A0F0D">
+  <title>LCG - Reset Password</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">L</div>
+          <span>LCG</span>
+        </div>
+        <h1 class="auth-title">Reset Password</h1>
+        <p class="auth-subtitle">Enter your email to receive reset instructions</p>
+      </div>
+      
+      <form id="forgot-form">
+        <div class="form-group">
+          <label class="form-label" for="email">
+            <i class="fa-solid fa-envelope"></i> Email Address
+          </label>
+          <input 
+            type="email" 
+            id="email" 
+            class="input" 
+            placeholder="you@example.com" 
+            required
+          >
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+          <i class="fa-solid fa-paper-plane"></i>
+          Send Reset Link
+        </button>
+      </form>
+      
+      <div class="auth-footer">
+        <p class="text-muted">
+          Remember your password? 
+          <a href="/index.html" style="color: var(--primary); font-weight: 700;">
+            Sign In
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase } from '/assets/js/lcg-client.js';
+    
+    document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const submitBtn = document.getElementById('submit-btn');
+      
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+      
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + '/index.html'
+        });
+        
+        if (error) throw error;
+        
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Email Sent!';
+        submitBtn.style.background = 'var(--success)';
+        
+        alert('Password reset link sent to your email. Check your inbox!');
+        
+        setTimeout(() => {
+          window.location.href = '/index.html';
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Password reset error:', error);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Reset Link';
+        alert(error.message || 'Failed to send reset email.');
+      }
+    });
+  </script>
+</body>
+</html>
