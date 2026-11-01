@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A0F0D">
+  <title>LCG - Dashboard</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  
+  <style>
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .quick-action-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      text-align: center;
+      transition: all var(--transition-normal);
+      cursor: pointer;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+    
+    .quick-action-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    
+    .quick-action-card i {
+      font-size: 2rem;
+      margin-bottom: var(--spacing-sm);
+      display: block;
+    }
+    
+    .quick-action-card.primary i {
+      color: var(--primary);
+    }
+    
+    .quick-action-card.gold i {
+      color: var(--gold);
+    }
+    
+    .quick-action-card.muted i {
+      color: var(--text-muted);
+    }
+    
+    .quick-action-card span {
+      font-size: 0.875rem;
+      font-weight: 600;
+      display: block;
+    }
+    
+    .welcome-banner {
+      background: linear-gradient(135deg, var(--primary-dim), var(--gold-dim));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      margin-bottom: var(--spacing-lg);
+      text-align: center;
+    }
+    
+    .welcome-banner h2 {
+      margin-bottom: var(--spacing-xs);
+      color: var(--text-primary);
+    }
+    
+    .welcome-banner p {
+      color: var(--text-muted);
+      margin: 0;
+    }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-family: 'Sora', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin-bottom: var(--spacing-xs);
+    }
+    
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header and Nav will be injected by components.js -->
+  
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <!-- Welcome Banner -->
+    <div class="welcome-banner fade-in">
+      <h2>Welcome to LCG</h2>
+      <p>Your investment journey starts here</p>
+    </div>
+    
+    <!-- Stats Row -->
+    <div class="stats-row fade-in">
+      <div class="stat-card">
+        <div class="stat-value" id="total-earned">₦0</div>
+        <div class="stat-label">Total Earned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="active-investments">0</div>
+        <div class="stat-label">Active Plans</div>
+      </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <h3 style="margin-bottom: var(--spacing-md);">Quick Actions</h3>
+    <div class="dashboard-grid fade-in">
+      <a href="/app/deposit.html" class="quick-action-card primary">
+        <i class="fa-solid fa-arrow-down"></i>
+        <span>Deposit</span>
+      </a>
+      <a href="/app/withdraw.html" class="quick-action-card gold">
+        <i class="fa-solid fa-arrow-up"></i>
+        <span>Withdraw</span>
+      </a>
+      <a href="/app/products.html" class="quick-action-card primary">
+        <i class="fa-solid fa-box-open"></i>
+        <span>Invest</span>
+      </a>
+      <a href="/app/team.html" class="quick-action-card muted">
+        <i class="fa-solid fa-users"></i>
+        <span>Team</span>
+      </a>
+      <a href="/app/wheel.html" class="quick-action-card gold">
+        <i class="fa-solid fa-dharmachakra"></i>
+        <span>Lucky Wheel</span>
+      </a>
+      <a href="/app/support.html" class="quick-action-card muted">
+        <i class="fa-solid fa-headset"></i>
+        <span>Support</span>
+      </a>
+    </div>
+    
+    <!-- Recent Activity Placeholder -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <h3 class="card-title">Recent Activity</h3>
+        <a href="/app/wallet.html" class="text-primary" style="font-size: 0.875rem;">View All</a>
+      </div>
+      <div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">
+        <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: var(--spacing-md); display: block;"></i>
+        <p>No recent transactions</p>
+        <small>Start by making your first deposit</small>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell, updateBalance } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+    
+    // Require authentication
+    const user = await requireAuth();
+    if (!user) {
+      // Redirect handled by requireAuth
+      return;
+    }
+    
+    // Load shell (header + nav)
+    await loadShell();
+    
+    // Load user stats
+    try {
+      // Get wallet balance
+      const { data: wallet } = await supabase
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (wallet) {
+        updateBalance(wallet.balance);
+      }
+      
+      // Get total earned (sum of all approved transactions)
+      const { data: transactions } = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('status', 'approved')
+        .in('type', ['investment_return', 'referral_commission', 'wheel_win']);
+      
+      const totalEarned = transactions?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      document.getElementById('total-earned').textContent = formatCurrency(totalEarned);
+      
+      // Get active investments count
+      const { count: activeCount } = await supabase
+        .from('investments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      
+      document.getElementById('active-investments').textContent = activeCount || 0;
+      
+    } catch (error) {
+      console.error('Dashboard load error:', error);
+    }
+  </script>
+</body>
+</html>
