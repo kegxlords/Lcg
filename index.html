@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0A0F0D">
+  <meta name="description" content="LCG - Invest Smart. Earn Daily.">
+  <title>LCG - Sign In</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/assets/css/style.css">
+  
+  <style>
+    .auth-card {
+      animation: slideUp 0.5s ease;
+    }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: var(--spacing-lg) 0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+      margin: 0 var(--spacing-md);
+    }
+    
+    .forgot-link {
+      display: inline-block;
+      margin-top: var(--spacing-md);
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+    
+    .forgot-link:hover {
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">L</div>
+          <span>LCG</span>
+        </div>
+        <h1 class="auth-title">Welcome Back</h1>
+        <p class="auth-subtitle">Sign in to continue earning</p>
+      </div>
+      
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="email">
+            <i class="fa-solid fa-envelope"></i> Email Address
+          </label>
+          <input 
+            type="email" 
+            id="email" 
+            class="input" 
+            placeholder="you@example.com" 
+            required 
+            autocomplete="email"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">
+            <i class="fa-solid fa-lock"></i> Password
+          </label>
+          <input 
+            type="password" 
+            id="password" 
+            class="input" 
+            placeholder="••••••••" 
+            required 
+            autocomplete="current-password"
+            minlength="6"
+          >
+        </div>
+        
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          Sign In
+        </button>
+        
+        <a href="/forgot.html" class="forgot-link text-center">
+          <i class="fa-solid fa-key"></i> Forgot Password?
+        </a>
+      </form>
+      
+      <div class="divider">or</div>
+      
+      <div class="auth-footer">
+        <p class="text-muted">
+          Don't have an account? 
+          <a href="/register.html" style="color: var(--primary); font-weight: 700;">
+            Create Account
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module">
+    import { supabase } from '/assets/js/lcg-client.js';
+    
+    // Check if already logged in
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      window.location.href = '/app/dashboard.html';
+    }
+    
+    // Handle form submission
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const submitBtn = document.getElementById('submit-btn');
+      
+      // Disable button and show loading
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Signing in...';
+      
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (error) throw error;
+        
+        // Show success message
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Success! Redirecting...';
+        submitBtn.style.background = 'var(--success)';
+        
+        // Redirect to dashboard
+        setTimeout(() => {
+          window.location.href = '/app/dashboard.html';
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Login error:', error);
+        
+        // Show error
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
+        
+        // Show error toast (you can implement a toast system later)
+        alert(error.message || 'Failed to sign in. Please check your credentials.');
+      }
+    });
+    
+    // Check for redirect parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirect = urlParams.get('redirect');
+    if (redirect) {
+      console.log('Will redirect to:', redirect);
+    }
+  </script>
+</body>
+</html>
