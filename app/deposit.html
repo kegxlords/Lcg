@@ -51,8 +51,8 @@
     import { supabase } from '/assets/js/lcg-client.js';
 
     const user = await requireAuth();
-    if (!user) return;
-    await loadShell();
+    if (user) {
+      await loadShell();
 
     // Load bank details
     const { data: settings } = await supabase.from('site_settings').select('key, value');
@@ -104,7 +104,8 @@
         alert('Deposit submitted successfully! Please wait for admin approval.');
         window.location.href = '/app/wallet.html';
       }
-    });
+      });
+    }
   </script>
 </body>
 </html>

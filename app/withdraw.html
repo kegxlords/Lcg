@@ -57,8 +57,8 @@
     import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
 
     const user = await requireAuth();
-    if (!user) return;
-    await loadShell();
+    if (user) {
+      await loadShell();
 
     // Load balance and fee
     const balRes = await fetch('/api/wallet?action=getBalance', {
@@ -108,7 +108,8 @@
         alert('Withdrawal requested successfully! Your balance has been deducted pending approval.');
         window.location.href = '/app/wallet.html';
       }
-    });
+      });
+    }
   </script>
 </body>
 </html>
