@@ -117,16 +117,17 @@
     </div>
   </div>
   
-  <script type="module">
+<script type="module">
     import { supabase } from '/assets/js/lcg-client.js';
     
-    // Check if already logged in
+    // 1. Check if already logged in
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
+      console.log('Already logged in, redirecting...');
       window.location.href = '/app/dashboard.html';
     }
     
-    // Handle form submission
+    // 2. Handle form submission
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -134,7 +135,7 @@
       const password = document.getElementById('password').value;
       const submitBtn = document.getElementById('submit-btn');
       
-      // Disable button and show loading
+      // Disable button
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Signing in...';
       
@@ -146,33 +147,26 @@
         
         if (error) throw error;
         
-        // Show success message
-        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Success! Redirecting...';
+        // SUCCESS: Wait a tiny bit for localStorage to sync, then redirect
+        submitBtn.innerHTML = '<i class="fa-solid fa-check"></i> Success!';
         submitBtn.style.background = 'var(--success)';
         
-        // Redirect to dashboard
+        console.log('Login successful, user:', data.user.email);
+        
+        // Force a session refresh to ensure it's saved before redirecting
+        await supabase.auth.refreshSession();
+        
         setTimeout(() => {
           window.location.href = '/app/dashboard.html';
-        }, 1000);
+        }, 500);
         
       } catch (error) {
         console.error('Login error:', error);
-        
-        // Show error
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Sign In';
-        
-        // Show error toast (you can implement a toast system later)
-        alert(error.message || 'Failed to sign in. Please check your credentials.');
+        alert(error.message || 'Failed to sign in.');
       }
     });
-    
-    // Check for redirect parameter
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirect = urlParams.get('redirect');
-    if (redirect) {
-      console.log('Will redirect to:', redirect);
-    }
-  </script>
+</script>
 </body>
 </html>
