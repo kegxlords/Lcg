@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Wallet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .balance-card {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-xl);
+      text-align: center;
+      margin-bottom: var(--spacing-lg);
+      color: var(--bg);
+    }
+    .balance-card h2 { font-size: 1rem; opacity: 0.9; margin-bottom: var(--spacing-xs); }
+    .balance-card .amount { font-family: 'Sora', sans-serif; font-size: 2.5rem; font-weight: 800; }
+    .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: var(--spacing-md); }
+    .tab { flex: 1; padding: var(--spacing-md); text-align: center; cursor: pointer; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid transparent; }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-md) 0; border-bottom: 1px solid var(--border); }
+    .list-item:last-child { border-bottom: none; }
+    .status-badge { padding: 4px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; }
+    .status-pending { background: rgba(255, 176, 32, 0.2); color: var(--warning); }
+    .status-approved { background: rgba(0, 224, 138, 0.2); color: var(--success); }
+    .status-rejected { background: rgba(255, 90, 90, 0.2); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <div class="balance-card fade-in">
+      <h2>Available Balance</h2>
+      <div class="amount" id="balance-display">₦0.00</div>
+    </div>
+
+    <div class="action-buttons fade-in">
+      <a href="/app/deposit.html" class="btn btn-primary btn-block"><i class="fa-solid fa-arrow-down"></i> Deposit</a>
+      <a href="/app/withdraw.html" class="btn btn-gold btn-block"><i class="fa-solid fa-arrow-up"></i> Withdraw</a>
+    </div>
+
+    <div class="card fade-in">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('transactions')">Transactions</div>
+        <div class="tab" onclick="switchTab('deposits')">Deposits</div>
+        <div class="tab" onclick="switchTab('withdrawals')">Withdrawals</div>
+      </div>
+      <div id="list-container">
+        <div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">
+          <i class="fa-solid fa-circle-notch fa-spin"></i> Loading...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    let currentTab = 'transactions';
+    let historyData = {};
+
+    async function loadData() {
+      const res = await fetch('/api/wallet?action=getHistory', {
+        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+      });
+      historyData = await res.json();
+      renderList();
+      
+      // Update balance in header
+      const balRes = await fetch('/api/wallet?action=getBalance', {
+        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+      });
+      const { balance } = await balRes.json();
+      document.getElementById('balance-display').textContent = formatCurrency(balance);
+    }
+
+    window.switchTab = (tab) => {
+      currentTab = tab;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      renderList();
+    };
+
+    function renderList() {
+      const container = document.getElementById('list-container');
+      let data = [];
+      let typeKey = '';
+
+      if (currentTab === 'transactions') { data = historyData.transactions || []; typeKey = 'type'; }
+      else if (currentTab === 'deposits') { data = historyData.deposits || []; typeKey = 'payment_method'; }
+      else { data = historyData.withdrawals || []; typeKey = 'bank_name'; }
+
+      if (data.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">No records found</div>';
+        return;
+      }
+
+      container.innerHTML = data.map(item => `
+        <div class="list-item">
+          <div>
+            <div style="font-weight: 600; font-size: 0.9rem;">${item.description || item[typeKey] || 'Record'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${new Date(item.created_at).toLocaleDateString()}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-family: 'Sora'; font-weight: 700;">${formatCurrency(item.amount)}</div>
+            <span class="status-badge status-${item.status}">${item.status}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
