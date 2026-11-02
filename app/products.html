@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Products</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .tabs { display: flex; background: var(--surface); border-radius: var(--radius-lg); padding: 4px; margin-bottom: var(--spacing-lg); }
+    .tab { flex: 1; padding: 12px; text-align: center; border-radius: var(--radius-md); cursor: pointer; font-weight: 600; color: var(--text-muted); transition: all 0.3s; }
+    .tab.active { background: var(--primary); color: var(--bg); }
+    
+    .product-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-md); position: relative; overflow: hidden; }
+    .product-card.coming-soon { opacity: 0.6; }
+    .product-card.sold-out { border-color: var(--danger); }
+    
+    .badge-soon { position: absolute; top: 12px; right: 12px; background: var(--warning); color: var(--bg); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 700; }
+    .badge-limited { position: absolute; top: 12px; right: 12px; background: var(--gold); color: var(--bg); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.7rem; font-weight: 700; }
+    
+    .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md); }
+    .product-name { font-family: 'Sora'; font-size: 1.2rem; font-weight: 700; }
+    .product-price { font-family: 'Sora'; font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+    
+    .product-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
+    .stat-box { background: var(--bg); padding: 10px; border-radius: var(--radius-md); text-align: center; }
+    .stat-box span { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; }
+    .stat-box strong { font-family: 'Sora'; font-size: 0.9rem; color: var(--gold); }
+    
+    .capacity-bar { background: var(--bg); height: 6px; border-radius: 3px; margin-bottom: var(--spacing-md); overflow: hidden; }
+    .capacity-fill { background: var(--primary); height: 100%; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <h2 style="margin-bottom: var(--spacing-lg);">Investment Products</h2>
+
+    <div class="tabs fade-in">
+      <div class="tab active" onclick="filterProducts('General', this)">General</div>
+      <div class="tab" onclick="filterProducts('Welfare', this)">Welfare</div>
+      <div class="tab" onclick="filterProducts('Limited', this)">Limited</div>
+    </div>
+
+    <div id="products-container" class="fade-in">
+      <div style="text-align: center; padding: var(--spacing-xl); color: var(--text-muted);">
+        <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell, updateBalance } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    let allProducts = [];
+    let currentCategory = 'General';
+
+    async function loadProducts() {
+      const res = await fetch('/api/products?action=getProducts', {
+        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+      });
+      const data = await res.json();
+      allProducts = data.products || [];
+      renderProducts();
+    }
+
+    window.filterProducts = (category, el) => {
+      currentCategory = category;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      renderProducts();
+    };
+
+    function renderProducts() {
+      const container = document.getElementById('products-container');
+      const filtered = allProducts.filter(p => p.category === currentCategory);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: var(--spacing-xl); color: var(--text-muted);">No products available in this category.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => {
+        const isComingSoon = p.is_coming_soon;
+        const isSoldOut = p.category === 'Limited' && p.current_sold >= p.max_capacity;
+        const capacityPercent = p.category === 'Limited' ? (p.current_sold / p.max_capacity) * 100 : 0;
+
+        return `
+          <div class="product-card ${isComingSoon ? 'coming-soon' : ''} ${isSoldOut ? 'sold-out' : ''}">
+            ${isComingSoon ? '<div class="badge-soon">COMING SOON</div>' : ''}
+            ${p.category === 'Limited' && !isComingSoon ? `<div class="badge-limited">${p.current_sold}/${p.max_capacity} SOLD</div>` : ''}
+            
+            <div class="product-header">
+              <div class="product-name">${p.name}</div>
+              <div class="product-price">${formatCurrency(p.price)}</div>
+            </div>
+
+            <div class="product-stats">
+              <div class="stat-box"><span>Profit</span><strong>${formatCurrency(p.profit)}</strong></div>
+              <div class="stat-box"><span>Duration</span><strong>${p.duration_days} Days</strong></div>
+              <div class="stat-box"><span>Payout</span><strong>${p.payout_type === 'daily' ? 'Daily' : 'Lump Sum'}</strong></div>
+            </div>
+
+            ${p.category === 'Limited' ? `
+              <div class="capacity-bar"><div class="capacity-fill" style="width: ${capacityPercent}%"></div></div>
+            ` : ''}
+
+            <button 
+              class="btn ${isComingSoon || isSoldOut ? 'btn-secondary' : 'btn-primary'} btn-block" 
+              ${isComingSoon || isSoldOut ? 'disabled' : `onclick="buyProduct('${p.id}', '${p.name}', ${p.price})"`}
+            >
+              ${isComingSoon ? 'Coming Soon' : isSoldOut ? 'Sold Out' : 'Invest Now'}
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.buyProduct = async (id, name, price) => {
+      if (!confirm(`Are you sure you want to invest ${formatCurrency(price)} in ${name}?`)) return;
+      
+      const res = await fetch('/api/products?action=buyProduct', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` 
+        },
+        body: JSON.stringify({ product_id: id })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error);
+      } else {
+        alert('Investment successful! You earned 1 Lucky Spin.');
+        updateBalance(data.investment.amount); // Rough update, better to fetch real balance
+        loadProducts(); // Refresh to update capacity
+      }
+    };
+
+    loadProducts();
+  </script>
+</body>
+</html>
