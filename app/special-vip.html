@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Special VIPs</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .vip-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-lg);
+      margin-bottom: var(--spacing-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .vip-card.unlocked {
+      border-color: var(--gold);
+      box-shadow: 0 0 20px rgba(245, 197, 24, 0.1);
+    }
+    .vip-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md); }
+    .vip-name { font-family: 'Sora'; font-size: 1.2rem; font-weight: 800; color: var(--gold); }
+    .vip-badge { padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; }
+    .badge-locked { background: rgba(143, 168, 160, 0.2); color: var(--text-muted); }
+    .badge-active { background: var(--gold); color: var(--bg); }
+    
+    .rewards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
+    .reward-box { background: var(--bg); padding: 10px; border-radius: var(--radius-md); text-align: center; }
+    .reward-box span { display: block; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; }
+    .reward-box strong { font-family: 'Sora'; font-size: 0.9rem; color: var(--primary); }
+    
+    .req-item { margin-bottom: 12px; }
+    .req-header { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px; }
+    .req-header span:first-child { color: var(--text-muted); }
+    .req-header span:last-child { font-weight: 700; color: var(--text-primary); }
+    .progress-bg { background: var(--bg); height: 6px; border-radius: 3px; overflow: hidden; }
+    .progress-fill { background: var(--primary); height: 100%; transition: width 0.5s ease; }
+    .progress-fill.complete { background: var(--gold); }
+  </style>
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <h2 style="margin-bottom: var(--spacing-xs);">Special Referral VIPs</h2>
+    <p style="color: var(--text-muted); margin-bottom: var(--spacing-lg);">Unlock exclusive tiers by growing your team. Earn daily & monthly salaries automatically.</p>
+
+    <div id="payout-toast" style="display:none; background: var(--primary-dim); border: 1px solid var(--primary); color: var(--primary); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); text-align: center; font-weight: 600;">
+      <i class="fa-solid fa-coins"></i> <span id="payout-amount">₦0</span> salary auto-credited!
+    </div>
+
+    <div id="vip-container" class="fade-in">
+      <div style="text-align: center; padding: var(--spacing-xl); color: var(--text-muted);">
+        <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell, updateBalance } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    async function loadVIPs() {
+      const token = (await supabase.auth.getSession()).data.session.access_token;
+      
+      // 1. Trigger Auto-Payout
+      const payoutRes = await fetch('/api/special-vip?action=autoPayout', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const payoutData = await payoutRes.json();
+      
+      if (payoutData.credited > 0) {
+        document.getElementById('payout-amount').textContent = formatCurrency(payoutData.credited);
+        document.getElementById('payout-toast').style.display = 'block';
+        updateBalance(payoutData.new_balance);
+        setTimeout(() => document.getElementById('payout-toast').style.display = 'none', 5000);
+      }
+
+      // 2. Fetch Tiers
+      const res = await fetch('/api/special-vip?action=getMyTiers', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const { tiers } = await res.json();
+      renderVIPs(tiers);
+    }
+
+    function renderVIPs(tiers) {
+      const container = document.getElementById('vip-container');
+      
+      container.innerHTML = tiers.map(t => {
+        const isUnlocked = t.is_unlocked;
+        const stats = t.user_stats || { active_downlines: 0, total_team_deposit: 0, total_personal_deposit: 0 };
+        
+        // Calculate progress percentages
+        const pDownlines = Math.min(100, (stats.active_downlines / t.req_downlines) * 100);
+        const pTeam = Math.min(100, (stats.total_team_deposit / t.req_team_deposit) * 100);
+        const pPersonal = Math.min(100, (stats.total_personal_deposit / t.req_personal_deposit) * 100);
+
+        return `
+          <div class="vip-card ${isUnlocked ? 'unlocked' : ''}">
+            <div class="vip-header">
+              <div class="vip-name">${t.tier_name}</div>
+              <div class="vip-badge ${isUnlocked ? 'badge-active' : 'badge-locked'}">
+                ${isUnlocked ? '<i class="fa-solid fa-crown"></i> ACTIVE' : 'LOCKED'}
+              </div>
+            </div>
+
+            ${isUnlocked ? `
+              <div class="rewards-grid">
+                <div class="reward-box">
+                  <span>Daily Salary</span>
+                  <strong>${formatCurrency(t.daily_salary)}</strong>
+                </div>
+                <div class="reward-box">
+                  <span>Monthly Salary</span>
+                  <strong>${formatCurrency(t.monthly_salary)}</strong>
+                </div>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">
+                Next daily payout: 24h cycle • Next monthly: 30-day cycle
+              </div>
+            ` : `
+              <div class="req-item">
+                <div class="req-header">
+                  <span>Active Downlines</span>
+                  <span>${stats.active_downlines} / ${t.req_downlines}</span>
+                </div>
+                <div class="progress-bg"><div class="progress-fill ${pDownlines >= 100 ? 'complete' : ''}" style="width: ${pDownlines}%"></div></div>
+              </div>
+              <div class="req-item">
+                <div class="req-header">
+                  <span>Team Deposit</span>
+                  <span>${formatCurrency(stats.total_team_deposit)} / ${formatCurrency(t.req_team_deposit)}</span>
+                </div>
+                <div class="progress-bg"><div class="progress-fill ${pTeam >= 100 ? 'complete' : ''}" style="width: ${pTeam}%"></div></div>
+              </div>
+              <div class="req-item">
+                <div class="req-header">
+                  <span>Personal Deposit</span>
+                  <span>${formatCurrency(stats.total_personal_deposit)} / ${formatCurrency(t.req_personal_deposit)}</span>
+                </div>
+                <div class="progress-bg"><div class="progress-fill ${pPersonal >= 100 ? 'complete' : ''}" style="width: ${pPersonal}%"></div></div>
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+
+    loadVIPs();
+  </script>
+</body>
+</html>
