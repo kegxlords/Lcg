@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Admin Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    /* Admin Specific Styles */
+    body { padding-bottom: 0; }
+    .admin-header { background: var(--surface); padding: var(--spacing-md) var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+    .admin-tabs { display: flex; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 var(--spacing-md); }
+    .admin-tab { padding: 15px 20px; color: var(--text-muted); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+    .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .admin-content { padding: var(--spacing-lg); max-width: 1200px; margin: 0 auto; }
+    .section { display: none; }
+    .section.active { display: block; animation: fadeIn 0.3s ease; }
+    
+    .admin-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
+    .admin-table { width: 100%; border-collapse: collapse; margin-top: var(--spacing-md); }
+    .admin-table th, .admin-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .admin-table th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    
+    .input-sm { padding: 8px; font-size: 0.9rem; }
+    .status-badge { padding: 4px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; }
+    .status-pending { background: rgba(255, 176, 32, 0.2); color: var(--warning); }
+    .status-approved { background: rgba(0, 224, 138, 0.2); color: var(--success); }
+    .status-rejected { background: rgba(255, 90, 90, 0.2); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <header class="admin-header">
+    <div style="font-family: 'Sora'; font-weight: 800; font-size: 1.5rem; color: var(--primary);">LCG ADMIN</div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <span id="admin-email" style="color: var(--text-muted); font-size: 0.9rem;">Loading...</span>
+      <button class="btn btn-danger btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+    </div>
+  </header>
+
+  <nav class="admin-tabs">
+    <div class="admin-tab active" onclick="switchTab('dashboard')">Dashboard</div>
+    <div class="admin-tab" onclick="switchTab('deposits')">Deposits</div>
+    <div class="admin-tab" onclick="switchTab('withdrawals')">Withdrawals</div>
+    <div class="admin-tab" onclick="switchTab('users')">Users</div>
+    <div class="admin-tab" onclick="switchTab('products')">Products</div>
+    <div class="admin-tab" onclick="switchTab('wheel')">Wheel</div>
+    <div class="admin-tab" onclick="switchTab('special-vips')">Special VIPs</div>
+    <div class="admin-tab" onclick="switchTab('support')">Support</div>
+    <div class="admin-tab" onclick="switchTab('settings')">Settings</div>
+  </nav>
+
+  <main class="admin-content">
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="section active">
+      <h2>Platform Overview</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); margin-top: var(--spacing-md);">
+        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Users</h3><div id="stat-users" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800;">0</div></div>
+        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Deposits</h3><div id="stat-deposits" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--primary);">₦0</div></div>
+        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Withdrawals</h3><div id="stat-withdrawals" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--gold);">₦0</div></div>
+        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Commissions Paid</h3><div id="stat-commissions" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800;">₦0</div></div>
+      </div>
+    </div>
+
+    <!-- DEPOSITS -->
+    <div id="deposits" class="section">
+      <h2>Deposit Requests</h2>
+      <div style="margin: 15px 0;">
+        <select id="dep-filter" class="input input-sm" style="width: auto;" onchange="loadDeposits()">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="dep-table">
+          <thead><tr><th>User</th><th>Amount</th><th>Sender</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WITHDRAWALS -->
+    <div id="withdrawals" class="section">
+      <h2>Withdrawal Requests</h2>
+      <div style="margin: 15px 0;">
+        <select id="wd-filter" class="input input-sm" style="width: auto;" onchange="loadWithdrawals()">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="wd-table">
+          <thead><tr><th>User</th><th>Amount</th><th>Bank Details</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="users" class="section">
+      <h2>User Management</h2>
+      <div style="display: flex; gap: 10px; margin: 15px 0;">
+        <input type="text" id="user-search" class="input input-sm" placeholder="Search email..." style="flex: 1;">
+        <button class="btn btn-primary btn-sm" onclick="loadUsers()">Search</button>
+      </div>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="user-table">
+          <thead><tr><th>Email</th><th>Name</th><th>Balance</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div id="products" class="section">
+      <h2>Product Management</h2>
+      <button class="btn btn-primary btn-sm" style="margin: 15px 0;" onclick="openProductModal()"><i class="fa-solid fa-plus"></i> Add Product</button>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="product-table">
+          <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Profit</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WHEEL -->
+    <div id="wheel" class="section">
+      <h2>Lucky Wheel Config</h2>
+      <div class="admin-card">
+        <label class="form-label">Fixed Winning Amount (₦)</label>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="number" id="wheel-prize" class="input input-sm" style="width: 200px;">
+          <button class="btn btn-primary btn-sm" onclick="saveWheel()">Save Config</button>
+        </div>
+      </div>
+      <h3 style="margin-top: 30px;">Recent Spins</h3>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="spin-table">
+          <thead><tr><th>User</th><th>Amount Won</th><th>Trigger</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SPECIAL VIPS -->
+    <div id="special-vips" class="section">
+      <h2>Special Referral VIPs Configuration</h2>
+      <p style="color: var(--text-muted); margin-bottom: 20px;">Edit the requirements and salaries for the 5 non-purchasable VIP tiers.</p>
+      
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="vip-config-table">
+          <thead>
+            <tr>
+              <th>Tier Name</th>
+              <th>Daily Salary</th>
+              <th>Monthly Salary</th>
+              <th>Req. Downlines</th>
+              <th>Req. Team Dep</th>
+              <th>Req. Personal Dep</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top: 30px;">Unlocked VIPs Log</h3>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="unlocked-vip-table">
+          <thead><tr><th>User</th><th>Tier Unlocked</th><th>Unlocked At</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SUPPORT -->
+    <div id="support" class="section">
+      <h2>Support Tickets</h2>
+      <div class="admin-card" style="overflow-x: auto;">
+        <table class="admin-table" id="ticket-table">
+          <thead><tr><th>User</th><th>Subject</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settings" class="section">
+      <h2>Global Settings</h2>
+      <div class="admin-card">
+        <h3>Financial Settings</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+          <div>
+            <label class="form-label">Referral Commission (%)</label>
+            <input type="number" id="set-comm-pct" class="input input-sm">
+          </div>
+          <div>
+            <label class="form-label">Withdrawal Fee (%)</label>
+            <input type="number" id="set-wd-fee" class="input input-sm">
+          </div>
+          <div>
+            <label class="form-label">Min Deposit (₦)</label>
+            <input type="number" id="set-min-dep" class="input input-sm">
+          </div>
+          <div>
+            <label class="form-label">Min Withdrawal (₦)</label>
+            <input type="number" id="set-min-wd" class="input input-sm">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top: 15px;" onclick="saveFinancialSettings()">Save Financial Settings</button>
+      </div>
+
+      <div class="admin-card">
+        <h3>Bank Details (Shown to Users)</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+          <div>
+            <label class="form-label">Bank Name</label>
+            <input type="text" id="set-bank-name" class="input input-sm">
+          </div>
+          <div>
+            <label class="form-label">Account Number</label>
+            <input type="text" id="set-bank-acct" class="input input-sm">
+          </div>
+          <div>
+            <label class="form-label">Account Name</label>
+            <input type="text" id="set-bacct-name" class="input input-sm">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top: 15px;" onclick="saveBankSettings()">Save Bank Settings</button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { requireAdmin } from '/assets/js/auth-guard.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const admin = await requireAdmin();
+    if (!admin) {
+      document.body.innerHTML = '<div style="padding: 50px; text-align: center;">Access Denied</div>';
+    } else {
+      document.getElementById('admin-email').textContent = admin.email;
+      loadDashboard();
+    }
+
+    const apiCall = async (action, method = 'GET', body = null) => {
+      const opts = {
+        method,
+        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+      };
+      if (body) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(`/api/admin?action=${action}`, opts);
+      return await res.json();
+    };
+
+    // Tab Switching
+    window.switchTab = (tabId) => {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+      
+      // Load data for specific tabs
+      if (tabId === 'deposits') loadDeposits();
+      if (tabId === 'withdrawals') loadWithdrawals();
+      if (tabId === 'users') loadUsers();
+      if (tabId === 'products') loadProducts();
+      if (tabId === 'wheel') loadWheel();
+      if (tabId === 'special-vips') loadSpecialVIPs();
+      if (tabId === 'support') loadTickets();
+      if (tabId === 'settings') loadSettings();
+    };
+
+    // Dashboard
+    async function loadDashboard() {
+      const data = await apiCall('getDashboardStats');
+      document.getElementById('stat-users').textContent = data.total_users;
+      document.getElementById('stat-deposits').textContent = formatCurrency(data.total_deposits);
+      document.getElementById('stat-withdrawals').textContent = formatCurrency(data.total_withdrawals);
+      document.getElementById('stat-commissions').textContent = formatCurrency(data.total_commissions);
+    }
+
+    // Deposits
+    async function loadDeposits() {
+      const status = document.getElementById('dep-filter').value;
+      const data = await apiCall(`getDeposits&status=${status}`);
+      const tbody = document.querySelector('#dep-table tbody');
+      tbody.innerHTML = data.deposits.map(d => `
+        <tr>
+          <td>${d.profiles?.email || 'Unknown'}<br><small>${d.profiles?.full_name || ''}</small></td>
+          <td style="font-weight: 700; color: var(--primary);">${formatCurrency(d.amount)}</td>
+          <td>${d.sender_name || '-'}<br><small>${d.proof_ref || ''}</small></td>
+          <td><span class="status-badge status-${d.status}">${d.status}</span></td>
+          <td>${new Date(d.created_at).toLocaleDateString()}</td>
+          <td>
+            ${d.status === 'pending' ? `
+              <button class="btn btn-primary btn-sm" onclick="processDep('${d.id}', 'approved')">Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="processDep('${d.id}', 'rejected')">Reject</button>
+            ` : '-'}
+          </td>
+        </tr>
+      `).join('');
+    }
+    window.processDep = async (id, action) => {
+      if(!confirm(`Are you sure you want to ${action} this deposit?`)) return;
+      await apiCall('processDeposit', 'POST', { deposit_id: id, action });
+      loadDeposits(); loadDashboard();
+    };
+
+    // Withdrawals
+    async function loadWithdrawals() {
+      const status = document.getElementById('wd-filter').value;
+      const data = await apiCall(`getWithdrawals&status=${status}`);
+      const tbody = document.querySelector('#wd-table tbody');
+      tbody.innerHTML = data.withdrawals.map(w => `
+        <tr>
+          <td>${w.profiles?.email || 'Unknown'}</td>
+          <td style="font-weight: 700;">${formatCurrency(w.amount)}</td>
+          <td><small>${w.bank_name}<br>${w.account_number}<br>${w.account_name}</small></td>
+          <td><span class="status-badge status-${w.status}">${w.status}</span></td>
+          <td>
+            ${w.status === 'pending' ? `
+              <button class="btn btn-primary btn-sm" onclick="processWd('${w.id}', 'approved')">Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="processWd('${w.id}', 'rejected')">Reject</button>
+            ` : '-'}
+          </td>
+        </tr>
+      `).join('');
+    }
+    window.processWd = async (id, action) => {
+      if(!confirm(`Are you sure you want to ${action} this withdrawal?`)) return;
+      await apiCall('processWithdrawal', 'POST', { withdrawal_id: id, action });
+      loadWithdrawals(); loadDashboard();
+    };
+
+    // Users
+    async function loadUsers() {
+      const search = document.getElementById('user-search').value;
+      const data = await apiCall(`getUsers&search=${search}`);
+      const tbody = document.querySelector('#user-table tbody');
+      tbody.innerHTML = data.users.map(u => `
+        <tr>
+          <td>${u.email}</td>
+          <td>${u.full_name || '-'}</td>
+          <td style="font-weight: 700; color: var(--primary);">${formatCurrency(u.wallets?.[0]?.balance || 0)}</td>
+          <td>${u.is_frozen ? '<span class="status-badge status-rejected">Frozen</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
+          <td>
+            <button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+    window.toggleFreeze = async (id, status) => {
+      await apiCall('updateUser', 'POST', { user_id: id, is_frozen: status });
+      loadUsers();
+    };
+
+    // Products
+    async function loadProducts() {
+      const data = await apiCall('getProducts');
+      const tbody = document.querySelector('#product-table tbody');
+      tbody.innerHTML = data.products.map(p => `
+        <tr>
+          <td>${p.name}</td>
+          <td>${p.category}</td>
+          <td>${formatCurrency(p.price)}</td>
+          <td>${formatCurrency(p.profit)}</td>
+          <td>${p.duration_days} days</td>
+          <td>${p.is_coming_soon ? '<span class="status-badge status-pending">Coming Soon</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteProd('${p.id}')">Delete</button></td>
+        </tr>
+      `).join('');
+    }
+    window.deleteProd = async (id) => {
+      if(!confirm('Delete this product?')) return;
+      await apiCall('deleteProduct', 'POST', { id });
+      loadProducts();
+    };
+    window.openProductModal = () => alert('Product creation modal to be built in Phase 7 polish. Use Supabase table editor for now.');
+
+    // Wheel
+    async function loadWheel() {
+      const config = await apiCall('getWheelConfig');
+      document.getElementById('wheel-prize').value = config.config?.fixed_prize_amount || 600;
+      
+      const spins = await apiCall('getSpins');
+      const tbody = document.querySelector('#spin-table tbody');
+      tbody.innerHTML = spins.spins.map(s => `
+        <tr>
+          <td>${s.profiles?.email || 'Unknown'}</td>
+          <td style="font-weight: 700; color: var(--gold);">${formatCurrency(s.amount_won)}</td>
+          <td>${s.trigger_type}</td>
+          <td>${new Date(s.created_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    }
+    window.saveWheel = async () => {
+      const amount = document.getElementById('wheel-prize').value;
+      await apiCall('saveWheelConfig', 'POST', { fixed_prize_amount: amount });
+      alert('Wheel config saved!');
+    };
+
+    // Special VIPs
+    async function loadSpecialVIPs() {
+      const config = await apiCall('getSpecialVips');
+      const tbody = document.querySelector('#vip-config-table tbody');
+      tbody.innerHTML = config.tiers.map(t => `
+        <tr>
+          <td><strong>${t.tier_name}</strong></td>
+          <td><input type="number" id="daily-${t.id}" value="${t.daily_salary}" class="input input-sm" style="width: 100px;"></td>
+          <td><input type="number" id="monthly-${t.id}" value="${t.monthly_salary}" class="input input-sm" style="width: 100px;"></td>
+          <td><input type="number" id="down-${t.id}" value="${t.req_downlines}" class="input input-sm" style="width: 80px;"></td>
+          <td><input type="number" id="team-${t.id}" value="${t.req_team_deposit}" class="input input-sm" style="width: 100px;"></td>
+          <td><input type="number" id="pers-${t.id}" value="${t.req_personal_deposit}" class="input input-sm" style="width: 100px;"></td>
+          <td><button class="btn btn-primary btn-sm" onclick="saveVipTier(${t.id})">Save</button></td>
+        </tr>
+      `).join('');
+
+      const unlocked = await apiCall('getUnlockedVIPs');
+      const uTbody = document.querySelector('#unlocked-vip-table tbody');
+      uTbody.innerHTML = unlocked.unlocked.map(u => `
+        <tr>
+          <td>${u.profiles?.email || 'Unknown'}<br><small>${u.profiles?.full_name || ''}</small></td>
+          <td><span class="status-badge status-approved">${u.special_referral_tiers?.tier_name}</span></td>
+          <td>${new Date(u.unlocked_at).toLocaleDateString()}</td>
+        </tr>
+      `).join('');
+    }
+    window.saveVipTier = async (id) => {
+      const data = {
+        id,
+        daily_salary: document.getElementById(`daily-${id}`).value,
+        monthly_salary: document.getElementById(`monthly-${id}`).value,
+        req_downlines: document.getElementById(`down-${id}`).value,
+        req_team_deposit: document.getElementById(`team-${id}`).value,
+        req_personal_deposit: document.getElementById(`pers-${id}`).value
+      };
+      await apiCall('updateSpecialVip', 'POST', data);
+      alert('Tier updated!');
+    };
+
+    // Support
+    async function loadTickets() {
+      const data = await apiCall('getTickets&status=all');
+      const tbody = document.querySelector('#ticket-table tbody');
+      tbody.innerHTML = data.tickets.map(t => `
+        <tr>
+          <td>${t.profiles?.email || 'Unknown'}</td>
+          <td>${t.subject}</td>
+          <td><span class="status-badge status-${t.status === 'open' ? 'pending' : 'approved'}">${t.status}</span></td>
+          <td>${new Date(t.created_at).toLocaleDateString()}</td>
+          <td><button class="btn btn-sm btn-secondary">View</button></td>
+        </tr>
+      `).join('');
+    }
+
+    // Settings
+    async function loadSettings() {
+      // Fetch settings from Supabase directly for simplicity in admin
+      const { data } = await supabase.from('site_settings').select('key, value');
+      const map = {};
+      data.forEach(s => map[s.key] = s.value);
+      
+      document.getElementById('set-comm-pct').value = map['referral_commission_percentage'] || 10;
+      document.getElementById('set-wd-fee').value = map['withdrawal_fee_percentage'] || 0;
+      document.getElementById('set-min-dep').value = map['min_deposit'] || 1000;
+      document.getElementById('set-min-wd').value = map['min_withdrawal'] || 1000;
+      document.getElementById('set-bank-name').value = map['deposit_bank_name'] || '';
+      document.getElementById('set-bank-acct').value = map['deposit_account_number'] || '';
+      document.getElementById('set-bacct-name').value = map['deposit_account_name'] || '';
+    }
+    window.saveFinancialSettings = async () => {
+      const settings = [
+        { key: 'referral_commission_percentage', value: document.getElementById('set-comm-pct').value },
+        { key: 'withdrawal_fee_percentage', value: document.getElementById('set-wd-fee').value },
+        { key: 'min_deposit', value: document.getElementById('set-min-dep').value },
+        { key: 'min_withdrawal', value: document.getElementById('set-min-wd').value }
+      ];
+      await apiCall('saveSettings', 'POST', { settings });
+      alert('Financial settings saved!');
+    };
+    window.saveBankSettings = async () => {
+      const settings = [
+        { key: 'deposit_bank_name', value: document.getElementById('set-bank-name').value },
+        { key: 'deposit_account_number', value: document.getElementById('set-bank-acct').value },
+        { key: 'deposit_account_name', value: document.getElementById('set-bacct-name').value }
+      ];
+      await apiCall('saveSettings', 'POST', { settings });
+      alert('Bank settings saved!');
+    };
+
+    window.logout = async () => {
+      await supabase.auth.signOut();
+      window.location.href = '/index.html';
+    };
+  </script>
+</body>
+</html>
