@@ -21,7 +21,7 @@
     <p>Join LCG and start earning today</p>
   </div>
 
-  <form class="auth-form" onsubmit="event.preventDefault();toast('Account created! Welcome to LCG.','ok');setTimeout(()=>location.href='app/dashboard.html',800);">
+  <form class="auth-form" id="registerForm">
     <div class="field">
       <label for="name">Full name</label>
       <div class="input-wrap">
@@ -94,5 +94,6 @@ pw.addEventListener('input', () => {
   document.getElementById('pw-up').className = 'badge ' + (/[A-Z]/.test(v)?'jade':'muted');
 });
 </script>
+<script type="module" src="./assets/js/auth-page.js"></script>
 </body>
 </html>
