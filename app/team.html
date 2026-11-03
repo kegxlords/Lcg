@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - My Team</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .ref-card { background: linear-gradient(135deg, var(--primary-dim), var(--gold-dim)); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-lg); text-align: center; margin-bottom: var(--spacing-lg); }
+    .ref-code { font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--gold); letter-spacing: 4px; margin: var(--spacing-md) 0; }
+    .share-btns { display: flex; gap: var(--spacing-sm); justify-content: center; margin-top: var(--spacing-md); }
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
+    .stat-box { background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); text-align: center; border: 1px solid var(--border); }
+    .stat-box strong { display: block; font-family: 'Sora'; font-size: 1.2rem; color: var(--primary); margin-bottom: 4px; }
+    .stat-box span { font-size: 0.75rem; color: var(--text-muted); }
+    .downline-item { display: flex; justify-content: space-between; padding: var(--spacing-md) 0; border-bottom: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <h2>My Team</h2>
+    
+    <div class="ref-card fade-in">
+      <div style="font-size: 0.9rem; color: var(--text-muted);">Your Referral Code</div>
+      <div class="ref-code" id="ref-code">LOADING</div>
+      <button class="btn btn-primary btn-sm" onclick="copyCode()"><i class="fa-regular fa-copy"></i> Copy Code</button>
+      
+      <div class="share-btns">
+        <button class="btn btn-secondary btn-sm" onclick="shareWhatsApp()"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+        <button class="btn btn-secondary btn-sm" onclick="shareTelegram()"><i class="fa-brands fa-telegram"></i> Telegram</button>
+      </div>
+    </div>
+
+    <div class="stat-grid fade-in">
+      <div class="stat-box"><strong id="stat-downlines">0</strong><span>Downlines</span></div>
+      <div class="stat-box"><strong id="stat-team-dep">₦0</strong><span>Team Deposit</span></div>
+      <div class="stat-box"><strong id="stat-spins">0</strong><span>Available Spins</span></div>
+    </div>
+
+    <div class="card fade-in">
+      <h3 style="margin-bottom: var(--spacing-md);">My Downlines</h3>
+      <div id="downlines-list">
+        <div style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    async function loadData() {
+      const token = (await supabase.auth.getSession()).data.session.access_token;
+      
+      // 1. Referral Info
+      const infoRes = await fetch('/api/referrals?action=getReferralInfo', { headers: { 'Authorization': `Bearer ${token}` } });
+      const info = await infoRes.json();
+      
+      document.getElementById('ref-code').textContent = info.referral_code || 'N/A';
+      document.getElementById('stat-downlines').textContent = info.active_downlines;
+      document.getElementById('stat-team-dep').textContent = formatCurrency(info.team_deposit);
+      document.getElementById('stat-spins').textContent = info.available_spins;
+
+      // 2. Downlines
+      const downRes = await fetch('/api/referrals?action=getDownlines', { headers: { 'Authorization': `Bearer ${token}` } });
+      const { downlines } = await downRes.json();
+      
+      const list = document.getElementById('downlines-list');
+      if (downlines.length === 0) {
+        list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No downlines yet. Share your code!</div>';
+      } else {
+        list.innerHTML = downlines.map(d => `
+          <div class="downline-item">
+            <div>
+              <div style="font-weight: 600;">${d.full_name || 'Anonymous'}</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">${d.email}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Joined</div>
+              <div style="font-size: 0.8rem;">${new Date(d.created_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    window.copyCode = () => {
+      const code = document.getElementById('ref-code').textContent;
+      navigator.clipboard.writeText(code);
+      alert('Code copied!');
+    };
+
+    window.shareWhatsApp = () => {
+      const code = document.getElementById('ref-code').textContent;
+      const text = encodeURIComponent(`Join LCG and start earning daily! Use my referral code: ${code}`);
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+    };
+
+    window.shareTelegram = () => {
+      const code = document.getElementById('ref-code').textContent;
+      const text = encodeURIComponent(`Join LCG and start earning daily! Use my referral code: ${code}`);
+      window.open(`https://t.me/share/url?url=${window.location.origin}/register.html?ref=${code}&text=${text}`, '_blank');
+    };
+
+    loadData();
+  </script>
+</body>
+</html>
