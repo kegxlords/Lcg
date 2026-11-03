@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Support</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/assets/css/chat.css">
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <h2>Customer Service</h2>
+    
+    <!-- Ticket List View -->
+    <div id="ticket-list-view">
+      <button class="btn btn-primary btn-block" style="margin-bottom: var(--spacing-lg);" onclick="showCreateForm()">
+        <i class="fa-solid fa-plus"></i> New Ticket
+      </button>
+      <div id="tickets-container">
+        <div style="text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+      </div>
+    </div>
+
+    <!-- Create Ticket Form -->
+    <div id="create-ticket-view" style="display: none;">
+      <button class="btn btn-secondary btn-sm" style="margin-bottom: 15px;" onclick="showTicketList()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">Subject</label>
+          <input type="text" id="new-subject" class="input" placeholder="Brief description of issue">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message</label>
+          <textarea id="new-message" class="input" rows="4" placeholder="Describe your issue..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Attach Image (Optional)</label>
+          <input type="file" id="new-image" class="input" accept="image/*">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitTicket()">Submit Ticket</button>
+      </div>
+    </div>
+
+    <!-- Chat View -->
+    <div id="chat-view" style="display: none;">
+      <div class="chat-container">
+        <div class="chat-header">
+          <button class="btn btn-secondary btn-sm" onclick="showTicketList()"><i class="fa-solid fa-arrow-left"></i></button>
+          <span id="chat-subject" style="font-weight: 700;">Ticket Subject</span>
+          <span id="chat-status" class="status-badge status-approved">Open</span>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <!-- Messages injected here -->
+        </div>
+        <div class="chat-input-area">
+          <label for="chat-image" class="btn btn-secondary btn-sm" style="margin:0;"><i class="fa-solid fa-image"></i></label>
+          <input type="file" id="chat-image" style="display: none;" accept="image/*" onchange="previewImage(this)">
+          <textarea id="chat-input" placeholder="Type a message..." rows="1"></textarea>
+          <button class="btn btn-primary btn-sm" onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell } from '/assets/js/components.js';
+    import { supabase } from '/assets/js/lcg-client.js';
+    import { uploadImage, renderMessage } from '/assets/js/chat.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    let currentTicketId = null;
+    let pendingImage = null;
+
+    const apiCall = async (action, method = 'GET', body = null) => {
+      const opts = {
+        method,
+        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+      };
+      if (body) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      const res = await fetch(`/api/support?action=${action}`, opts);
+      return await res.json();
+    };
+
+    // Views
+    window.showTicketList = () => {
+      document.getElementById('ticket-list-view').style.display = 'block';
+      document.getElementById('create-ticket-view').style.display = 'none';
+      document.getElementById('chat-view').style.display = 'none';
+      currentTicketId = null;
+      loadTickets();
+    };
+
+    window.showCreateForm = () => {
+      document.getElementById('ticket-list-view').style.display = 'none';
+      document.getElementById('create-ticket-view').style.display = 'block';
+    };
+
+    function openChat(ticket) {
+      currentTicketId = ticket.id;
+      document.getElementById('ticket-list-view').style.display = 'none';
+      document.getElementById('chat-view').style.display = 'block';
+      document.getElementById('chat-subject').textContent = ticket.subject;
+      document.getElementById('chat-status').textContent = ticket.status;
+      loadMessages();
+    }
+
+    // Load Tickets
+    async function loadTickets() {
+      const data = await apiCall('getTickets');
+      const container = document.getElementById('tickets-container');
+      if (data.tickets.length === 0) {
+        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No tickets yet.</div>';
+        return;
+      }
+      container.innerHTML = data.tickets.map(t => `
+        <div class="ticket-list-item" onclick='openChat(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
+          <div>
+            <div style="font-weight: 600;">${t.subject}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">${new Date(t.created_at).toLocaleDateString()}</div>
+          </div>
+          <div><span class="status-dot ${t.status}"></span>${t.status}</div>
+        </div>
+      `).join('');
+    }
+
+    // Submit New Ticket
+    window.submitTicket = async () => {
+      const subject = document.getElementById('new-subject').value;
+      const message = document.getElementById('new-message').value;
+      const fileInput = document.getElementById('new-image');
+      
+      if (!subject || !message) return alert('Subject and message are required');
+
+      let imageUrl = null;
+      if (fileInput.files[0]) {
+        // We need a temp ID for the upload, we'll use Date.now()
+        imageUrl = await uploadImage(fileInput.files[0], `temp_${Date.now()}`);
+      }
+
+      const res = await apiCall('createTicket', 'POST', { subject, message, image_url: imageUrl });
+      if (res.success) {
+        alert('Ticket created!');
+        showTicketList();
+      } else {
+        alert(res.error);
+      }
+    };
+
+    // Load Messages
+    async function loadMessages() {
+      if (!currentTicketId) return;
+      const data = await apiCall(`getMessages&ticket_id=${currentTicketId}`);
+      const container = document.getElementById('chat-messages');
+      container.innerHTML = data.messages.map(renderMessage).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Image Preview
+    window.previewImage = (input) => {
+      if (input.files && input.files[0]) {
+        pendingImage = input.files[0];
+      }
+    };
+
+    // Send Message
+    window.sendChatMessage = async () => {
+      const input = document.getElementById('chat-input');
+      const message = input.value.trim();
+      if (!message && !pendingImage) return;
+
+      let imageUrl = null;
+      if (pendingImage) {
+        imageUrl = await uploadImage(pendingImage, currentTicketId);
+        pendingImage = null;
+        document.getElementById('chat-image').value = ''; // reset
+      }
+
+      const res = await apiCall('sendMessage', 'POST', { ticket_id: currentTicketId, message, image_url: imageUrl });
+      if (res.success) {
+        input.value = '';
+        loadMessages();
+      } else {
+        alert(res.error);
+      }
+    };
+
+    // Expose openChat to window for inline onclick
+    window.openChat = openChat;
+
+    loadTickets();
+  </script>
+</body>
+</html>
