@@ -42,6 +42,7 @@ export default async function handler(req, res) {
       // Special VIPs
       case 'getSpecialVips': return await getSpecialVips(res);
       case 'updateSpecialVip': return await updateSpecialVip(req, res);
+      case 'getUnlockedVIPs': return await getUnlockedVIPs(res);
       
       // Support
       case 'getTickets': return await getTickets(req, res);
@@ -107,12 +108,12 @@ async function processDeposit(req, res) {
   await supabaseAdmin.from('transactions').update({ status }).eq('reference', `DEP_${deposit_id.slice(0, 8).toUpperCase()}`);
 
   if (status === 'approved') {
-    // 1. Credit User
+    // 1. Credit User Wallet
     const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', deposit.user_id).single();
     const newBalance = Number(wallet?.balance || 0) + Number(deposit.amount);
     await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', deposit.user_id);
 
-    // 2. Trigger Referral Rewards (Commission + Spin + Stats)
+    // 2. Trigger Referral Rewards (Commission + Spin + Stats + Special VIP Check)
     await processDepositRewards(deposit.amount, deposit.user_id);
   }
 
@@ -145,7 +146,7 @@ async function processWithdrawal(req, res) {
   await supabaseAdmin.from('transactions').update({ status }).eq('reference', `WD_${withdrawal_id.slice(0, 8).toUpperCase()}`);
 
   if (status === 'rejected') {
-    // Refund balance
+    // Refund balance to user
     const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', withdrawal.user_id).single();
     const newBalance = Number(wallet?.balance || 0) + Number(withdrawal.amount);
     await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', withdrawal.user_id);
@@ -210,7 +211,17 @@ async function saveProduct(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { id, name, category, price, profit, duration_days, payout_type, max_capacity, is_active, is_coming_soon, sort_order } = req.body;
 
-  const productData = { name, category, price: Number(price), profit: Number(profit), duration_days: Number(duration_days), payout_type, is_active, is_coming_soon, sort_order: Number(sort_order) };
+  const productData = { 
+    name, category, 
+    price: Number(price), 
+    profit: Number(profit), 
+    duration_days: Number(duration_days), 
+    payout_type, 
+    is_active, 
+    is_coming_soon, 
+    sort_order: Number(sort_order) 
+  };
+  
   if (category === 'Limited') productData.max_capacity = Number(max_capacity);
 
   let error;
@@ -275,6 +286,16 @@ async function updateSpecialVip(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ success: true });
+}
+
+async function getUnlockedVIPs(res) {
+  const { data, error } = await supabaseAdmin
+    .from('user_special_vips')
+    .select('*, profiles(email, full_name), special_referral_tiers(tier_name)')
+    .order('unlocked_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ unlocked: data || [] });
 }
 
 // ==========================================
