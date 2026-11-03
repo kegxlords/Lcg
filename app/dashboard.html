@@ -1,229 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0A0F0D">
-  <title>LCG - Dashboard</title>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
-  
-  <style>
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--spacing-md);
-      margin-bottom: var(--spacing-lg);
-    }
-    
-    .quick-action-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: var(--spacing-lg);
-      text-align: center;
-      transition: all var(--transition-normal);
-      cursor: pointer;
-      text-decoration: none;
-      color: var(--text-primary);
-    }
-    
-    .quick-action-card:hover {
-      border-color: var(--primary);
-      transform: translateY(-4px);
-      box-shadow: var(--shadow-md);
-    }
-    
-    .quick-action-card i {
-      font-size: 2rem;
-      margin-bottom: var(--spacing-sm);
-      display: block;
-    }
-    
-    .quick-action-card.primary i {
-      color: var(--primary);
-    }
-    
-    .quick-action-card.gold i {
-      color: var(--gold);
-    }
-    
-    .quick-action-card.muted i {
-      color: var(--text-muted);
-    }
-    
-    .quick-action-card span {
-      font-size: 0.875rem;
-      font-weight: 600;
-      display: block;
-    }
-    
-    .welcome-banner {
-      background: linear-gradient(135deg, var(--primary-dim), var(--gold-dim));
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: var(--spacing-lg);
-      margin-bottom: var(--spacing-lg);
-      text-align: center;
-    }
-    
-    .welcome-banner h2 {
-      margin-bottom: var(--spacing-xs);
-      color: var(--text-primary);
-    }
-    
-    .welcome-banner p {
-      color: var(--text-muted);
-      margin: 0;
-    }
-    
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--spacing-md);
-      margin-bottom: var(--spacing-lg);
-    }
-    
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: var(--spacing-md);
-      text-align: center;
-    }
-    
-    .stat-value {
-      font-family: 'Sora', sans-serif;
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--primary);
-      margin-bottom: var(--spacing-xs);
-    }
-    
-    .stat-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — Dashboard</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <!-- Header and Nav will be injected by components.js -->
-  
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <!-- Welcome Banner -->
-    <div class="welcome-banner fade-in">
-      <h2>Welcome to LCG</h2>
-      <p>Your investment journey starts here</p>
+<div class="app" id="app"></div>
+
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+app.innerHTML = `
+${topbarHTML('home')}
+<main class="page page-enter">
+
+  <!-- greeting -->
+  <div class="flex between center">
+    <div>
+      <div class="small muted">Good evening,</div>
+      <div style="font-family:var(--f-display);font-size:20px;font-weight:600;">Adaeze 👋</div>
     </div>
-    
-    <!-- Stats Row -->
-    <div class="stats-row fade-in">
-      <div class="stat-card">
-        <div class="stat-value" id="total-earned">₦0</div>
-        <div class="stat-label">Total Earned</div>
+    <div class="badge gold" style="background:rgba(231,200,115,0.14);">VIP · Gold</div>
+  </div>
+
+  <!-- balance hero -->
+  <div class="hero-balance">
+    <div class="label"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 8px var(--jade-light);"></span> Total balance</div>
+    <div class="amount"><span class="cur">₦</span>17,600<span style="font-size:18px;color:var(--fg-muted);font-family:var(--f-body);font-weight:500;">.00</span></div>
+    <div class="sub-row">
+      <div class="sub">
+        <div class="k">Available</div>
+        <div class="v">${naira(LCG.user.available)}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value" id="active-investments">0</div>
-        <div class="stat-label">Active Plans</div>
+      <div class="sub">
+        <div class="k">Earnings</div>
+        <div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div>
       </div>
-    </div>
-    
-    <!-- Quick Actions -->
-    <h3 style="margin-bottom: var(--spacing-md);">Quick Actions</h3>
-    <div class="dashboard-grid fade-in">
-      <a href="/app/deposit.html" class="quick-action-card primary">
-        <i class="fa-solid fa-arrow-down"></i>
-        <span>Deposit</span>
-      </a>
-      <a href="/app/withdraw.html" class="quick-action-card gold">
-        <i class="fa-solid fa-arrow-up"></i>
-        <span>Withdraw</span>
-      </a>
-      <a href="/app/products.html" class="quick-action-card primary">
-        <i class="fa-solid fa-box-open"></i>
-        <span>Invest</span>
-      </a>
-      <a href="/app/team.html" class="quick-action-card muted">
-        <i class="fa-solid fa-users"></i>
-        <span>Team</span>
-      </a>
-      <a href="/app/wheel.html" class="quick-action-card gold">
-        <i class="fa-solid fa-dharmachakra"></i>
-        <span>Lucky Wheel</span>
-      </a>
-      <a href="/app/support.html" class="quick-action-card muted">
-        <i class="fa-solid fa-headset"></i>
-        <span>Support</span>
-      </a>
-    </div>
-    
-    <!-- Recent Activity Placeholder -->
-    <div class="card fade-in">
-      <div class="card-header">
-        <h3 class="card-title">Recent Activity</h3>
-        <a href="/app/wallet.html" class="text-primary" style="font-size: 0.875rem;">View All</a>
-      </div>
-      <div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">
-        <i class="fa-solid fa-receipt" style="font-size: 2rem; margin-bottom: var(--spacing-md); display: block;"></i>
-        <p>No recent transactions</p>
-        <small>Start by making your first deposit</small>
+      <div class="sub">
+        <div class="k">Invested</div>
+        <div class="v">${nairaShort(LCG.user.invested)}</div>
       </div>
     </div>
   </div>
-  
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell, updateBalance } from '/assets/js/components.js';
-    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
-    
-    // Require authentication
-    const user = await requireAuth();
-    if (user) {
-      // Load shell (header + nav)
-      await loadShell();
 
-      // Load user stats
-      try {
-      // Get wallet balance
-      const { data: wallet } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (wallet) {
-        updateBalance(wallet.balance);
-      }
-      
-      // Get total earned (sum of all approved transactions)
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .eq('status', 'approved')
-        .in('type', ['investment_return', 'referral_commission', 'wheel_win']);
-      
-      const totalEarned = transactions?.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      document.getElementById('total-earned').textContent = formatCurrency(totalEarned);
-      
-      // Get active investments count
-      const { count: activeCount } = await supabase
-        .from('investments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'active');
-      
-      document.getElementById('active-investments').textContent = activeCount || 0;
-      
-      } catch (error) {
-        console.error('Dashboard load error:', error);
-      }
-    }
-  </script>
+  <!-- primary actions -->
+  <div class="grid-2">
+    <a href="deposit.html" class="btn btn-jade" style="flex:1;">${I.deposit} Deposit</a>
+    <a href="withdraw.html" class="btn btn-ghost" style="flex:1;">${I.withdraw} Withdraw</a>
+  </div>
+
+  <!-- banner carousel -->
+  <div class="banner" data-carousel>
+    <div class="slide on" style="background:linear-gradient(135deg,#0a3a2a,#02160f);">
+      <div class="eyebrow">Limited series</div>
+      <div class="ttl">Obsidian — 3.8% daily</div>
+      <div class="desc">Only 500 slots. Premium allocation now open.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#3a2a0a,#1f1503);">
+      <div class="eyebrow" style="color:var(--gold-light);">Invite & earn</div>
+      <div class="ttl">10% referral bonus</div>
+      <div class="desc">Plus 3% on second-level team earnings.</div>
+    </div>
+    <div class="slide" style="background:linear-gradient(135deg,#2a0a3a,#150321);">
+      <div class="eyebrow" style="color:var(--violet);">Daily reward</div>
+      <div class="ttl">Lucky wheel spin</div>
+      <div class="desc">Win up to ₦1,000 every day. Free spin.</div>
+    </div>
+    <div class="dots"><i class="on"></i><i></i><i></i></div>
+  </div>
+
+  <!-- quick actions -->
+  <div class="card card-pad">
+    <div class="quick-grid">
+      <a href="#" class="quick-item" onclick="doCheckin();return false;">
+        <span class="ic gold">${I.sign}</span>
+        <span class="lbl">Check in</span>
+      </a>
+      <a href="team.html" class="quick-item">
+        <span class="ic">${I.team}</span>
+        <span class="lbl">My team</span>
+      </a>
+      <a href="wheel.html" class="quick-item">
+        <span class="ic violet">${I.wheel}</span>
+        <span class="lbl">Spin</span>
+      </a>
+      <a href="leaderboard.html" class="quick-item">
+        <span class="ic gold">${I.trophy}</span>
+        <span class="lbl">Ranks</span>
+      </a>
+      <a href="special-vip.html" class="quick-item">
+        <span class="ic gold">${I.vip}</span>
+        <span class="lbl">VIP</span>
+      </a>
+      <a href="#" class="quick-item" onclick="toast('Share your code: ADAEZE-LCG','ok');copyText('ADAEZE-LCG','Referral code');return false;">
+        <span class="ic">${I.invite}</span>
+        <span class="lbl">Invite</span>
+      </a>
+      <a href="support.html" class="quick-item">
+        <span class="ic">${I.service}</span>
+        <span class="lbl">Support</span>
+      </a>
+      <a href="#" class="quick-item" onclick="toast('App download coming soon','info');return false;">
+        <span class="ic">${I.download}</span>
+        <span class="lbl">App</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- live rates ticker (market data, not fake user activity) -->
+  <div class="ticker">
+    <div class="live"><span class="dot"></span>LIVE</div>
+    <div class="track"><div class="scroll">
+      ${LCG.rates.map(r => `<span>${r.k} <b class="${r.up?'':'down'}">${r.v}</b> ${r.d}</span>`).join('')}
+      ${LCG.rates.map(r => `<span>${r.k} <b class="${r.up?'':'down'}">${r.v}</b> ${r.d}</span>`).join('')}
+    </div></div>
+  </div>
+
+  <!-- stat row -->
+  <div class="stat-row">
+    <div class="stat lux">
+      <div class="k">${I.coin} Total earned</div>
+      <div class="v text-jade-grad">${naira(LCG.user.totalEarned)}</div>
+      <div class="delta up">▲ +12.4% this week</div>
+    </div>
+    <div class="stat lux">
+      <div class="k">${I.bolt} Active plans</div>
+      <div class="v">3</div>
+      <div class="delta up">▲ +1 new this week</div>
+    </div>
+  </div>
+
+  <!-- portfolio mini chart -->
+  <div class="card chart-card lux">
+    <div class="flex between center">
+      <div>
+        <div class="small muted">Portfolio growth · 7d</div>
+        <div style="font-family:var(--f-display);font-size:20px;font-weight:700;margin-top:2px;">${naira(LCG.user.totalEarned)}</div>
+      </div>
+      <span class="badge jade">▲ +12.4%</span>
+    </div>
+    <svg class="spark" style="margin-top:14px;" viewBox="0 0 320 56" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="sp" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#34d399" stop-opacity="0.4"/>
+          <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="M0 40 L40 38 L80 32 L120 34 L160 24 L200 20 L240 22 L280 12 L320 8" fill="none" stroke="#34d399" stroke-width="2"/>
+      <path d="M0 40 L40 38 L80 32 L120 34 L160 24 L200 20 L240 22 L280 12 L320 8 L320 56 L0 56 Z" fill="url(#sp)"/>
+    </svg>
+  </div>
+
+  <!-- featured plan -->
+  <div class="section-head"><h2>Featured plans</h2><a href="products.html" class="link">View all →</a></div>
+  <div class="scroll-x" style="display:flex;gap:12px;padding:4px;margin:-4px -4px 0;">
+    ${LCG.plans.filter(p=>!p.sold).slice(0,3).map(p => `
+      <a href="products.html" class="plan ${p.accent} lux" style="min-width:240px;flex-shrink:0;">
+        <div class="top">
+          <div><div class="name">${p.name}</div><div class="cat">${p.cat}</div></div>
+          ${p.badge?`<span class="tag ${p.accent}">${p.badge}</span>`:''}
+        </div>
+        <div class="stats">
+          <div class="s"><div class="k">Daily</div><div class="v ${p.accent}">${p.daily}%</div></div>
+          <div class="s"><div class="k">Cycle</div><div class="v">${p.days}d</div></div>
+          <div class="s"><div class="k">Return</div><div class="v ${p.accent}">${p.total}%</div></div>
+        </div>
+        <div class="cta"><span class="btn btn-ghost btn-sm btn-block">From ${nairaShort(p.min)}</span></div>
+      </a>
+    `).join('')}
+  </div>
+
+  <!-- recent activity -->
+  <div class="section-head"><h2>Recent activity</h2><a href="wallet.html" class="link">View all →</a></div>
+  <div class="card card-pad">
+    <div class="list">
+      ${LCG.transactions.slice(0,5).map(t => `
+        <div class="row">
+          <div class="ic-box ${t.tone}">${I[t.ic]||I.coin}</div>
+          <div class="body">
+            <div class="t">${t.type}</div>
+            <div class="s">${t.sub}</div>
+          </div>
+          <div class="end">
+            <div class="amt ${t.dir==='in'?'up':'down'}">${t.dir==='in'?'+':'−'}${naira(t.amt)}</div>
+            <div class="ts">${t.ts}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <div class="foot-mini">
+    <div class="logo-row">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/></svg>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    LCG Wealth Platform · Capital protected · Licensed<br>
+    Version 2.4.0 · © 2026 LCG
+  </div>
+</main>
+${bottomNavHTML('home')}
+`;
+</script>
 </body>
 </html>

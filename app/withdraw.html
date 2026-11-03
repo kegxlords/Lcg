@@ -1,115 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LCG - Withdraw</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — Withdraw</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <h2 style="margin-bottom: var(--spacing-lg);">Request Withdrawal</h2>
-
-    <div class="card fade-in">
-      <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-sm);">
-        <span style="color: var(--text-muted);">Available Balance</span>
-        <span style="font-family: 'Sora'; font-weight: 700; color: var(--primary);" id="balance-display">₦0.00</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
-        <span style="color: var(--text-muted);">Withdrawal Fee</span>
-        <span style="font-weight: 600;" id="fee-display">0%</span>
-      </div>
-    </div>
-
-    <form id="withdraw-form" class="card fade-in">
-      <div class="form-group">
-        <label class="form-label">Amount (₦)</label>
-        <input type="number" id="amount" class="input" placeholder="Min. 1000" required min="1000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Bank Name</label>
-        <input type="text" id="bank_name" class="input" placeholder="e.g. GTBank" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Account Number</label>
-        <input type="text" id="account_number" class="input" placeholder="10 digits" required maxlength="10">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Account Name</label>
-        <input type="text" id="account_name" class="input" placeholder="Name on account" required>
-      </div>
-      
-      <div style="background: var(--bg); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); display: flex; justify-content: space-between;">
-        <span style="font-weight: 600;">You will receive:</span>
-        <span style="font-family: 'Sora'; font-weight: 800; color: var(--gold);" id="net-amount">₦0.00</span>
-      </div>
-
-      <button type="submit" class="btn btn-gold btn-block btn-lg" id="submit-btn">
-        <i class="fa-solid fa-bolt"></i> Request Withdrawal
-      </button>
-    </form>
+<div class="app" id="app"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+const tier = LCG.tiers.find(t=>t.current);
+const fee = tier.fee;
+const limit = tier.dailyLimit;
+app.innerHTML = `
+${topbarHTML('me')}
+<main class="page page-enter">
+  <div class="page-head">
+    <h1>Withdraw</h1>
+    <p>Funds arrive within 30 minutes during business hours.</p>
   </div>
 
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell } from '/assets/js/components.js';
-    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+  <div class="hero-balance" style="padding:20px;">
+    <div class="label">Available to withdraw</div>
+    <div class="amount" style="font-size:34px;"><span class="cur">₦</span>${LCG.user.available.toLocaleString()}</div>
+    <div class="sub-row">
+      <div class="sub"><div class="k">VIP fee</div><div class="v">${fee}%</div></div>
+      <div class="sub"><div class="k">Daily limit</div><div class="v">${nairaShort(limit)}</div></div>
+      <div class="sub"><div class="k">Earnings</div><div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div></div>
+    </div>
+  </div>
 
-    const user = await requireAuth();
-    if (user) {
-      await loadShell();
+  <div class="field">
+    <label for="amount">Withdrawal amount</label>
+    <div class="input-wrap">
+      <span class="lead" style="color:var(--jade-light);font-weight:600;left:16px;">₦</span>
+      <input class="input has-lead" id="amount" type="number" placeholder="0" min="1000" oninput="updatePreview()">
+      <button class="trail" onclick="document.getElementById('amount').value=${LCG.user.available};updatePreview();" style="background:rgba(52,211,153,0.1);color:var(--jade-light);">MAX</button>
+    </div>
+  </div>
 
-    // Load balance and fee
-    const balRes = await fetch('/api/wallet?action=getBalance', {
-      headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
-    });
-    const { balance } = await balRes.json();
-    document.getElementById('balance-display').textContent = formatCurrency(balance);
+  <div class="amt-chips">
+    ${[1000,5000,10000,25000].map(c=>`<button class="amt-chip" onclick="document.getElementById('amount').value=${c};updatePreview();">₦${c/1000}K</button>`).join('')}
+  </div>
 
-    const { data: settings } = await supabase.from('site_settings').select('key, value');
-    const feePct = Number(settings?.find(s => s.key === 'withdrawal_fee_percentage')?.value || 0);
-    document.getElementById('fee-display').textContent = `${feePct}%`;
+  <div class="section-head"><h2>Payout account</h2><a href="#" class="link" onclick="toast('Add new account','info');return false;">+ Add</a></div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="method on" onclick="this.parentElement.querySelectorAll('.method').forEach(m=>m.classList.remove('on'));this.classList.add('on');">
+      <div class="ic-box gold" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;">GT</div>
+      <div class="body"><div class="t">GTBank</div><div class="s">•••• 2841 · Adaeze O.</div></div>
+      <div class="check on"></div>
+    </div>
+    <div class="method" onclick="this.parentElement.querySelectorAll('.method').forEach(m=>m.classList.remove('on'));this.classList.add('on');">
+      <div class="ic-box jade" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;">AC</div>
+      <div class="body"><div class="t">Access Bank</div><div class="s">•••• 7190 · Adaeze O.</div></div>
+      <div class="check"></div>
+    </div>
+  </div>
 
-    // Calculate net amount on input
-    document.getElementById('amount').addEventListener('input', (e) => {
-      const amount = Number(e.target.value) || 0;
-      const fee = (amount * feePct) / 100;
-      document.getElementById('net-amount').textContent = formatCurrency(amount - fee);
-    });
+  <div class="card card-pad">
+    <div class="flex between center" style="padding:4px 0;">
+      <span class="small muted">Amount</span>
+      <span id="pvAmount" class="tnum" style="font-weight:600;">₦0.00</span>
+    </div>
+    <div class="flex between center" style="padding:10px 0;border-bottom:1px solid var(--border);">
+      <span class="small muted">Withdrawal fee (${fee}%)</span>
+      <span id="pvFee" class="tnum small">−₦0.00</span>
+    </div>
+    <div class="flex between center" style="padding-top:10px;">
+      <span style="font-weight:600;">You receive</span>
+      <span id="pvReceive" class="tnum" style="font-family:var(--f-display);font-weight:700;color:var(--jade-light);font-size:18px;">₦0.00</span>
+    </div>
+  </div>
 
-    // Handle submit
-    document.getElementById('withdraw-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...';
+  <button class="btn btn-gold btn-block" onclick="confirmWithdraw()">${I.withdraw} Withdraw funds</button>
+  <p class="small muted" style="text-align:center;line-height:1.6;">Withdrawals process within 30 min (WAT 8am–10pm). Off-hours process next morning. VIP Gold tier receives priority.</p>
+</main>
+${bottomNavHTML('me')}
+`;
 
-      const res = await fetch('/api/wallet?action=requestWithdrawal', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` 
-        },
-        body: JSON.stringify({
-          amount: document.getElementById('amount').value,
-          bank_name: document.getElementById('bank_name').value,
-          account_number: document.getElementById('account_number').value,
-          account_name: document.getElementById('account_name').value
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Request Withdrawal';
-      } else {
-        alert('Withdrawal requested successfully! Your balance has been deducted pending approval.');
-        window.location.href = '/app/wallet.html';
-      }
-      });
-    }
-  </script>
+function updatePreview(){
+  const amt = parseFloat(document.getElementById('amount').value)||0;
+  const f = amt * fee / 100;
+  document.getElementById('pvAmount').textContent = naira(amt);
+  document.getElementById('pvFee').textContent = '−' + naira(f);
+  document.getElementById('pvReceive').textContent = naira(amt - f);
+}
+function confirmWithdraw(){
+  const amt = parseFloat(document.getElementById('amount').value)||0;
+  if(amt < 1000){ toast('Minimum withdrawal is ₦1,000','err'); return; }
+  if(amt > LCG.user.available){ toast('Amount exceeds available balance','err'); return; }
+  if(amt > limit){ toast('Exceeds daily VIP limit of '+nairaShort(limit),'err'); return; }
+  toast('Withdrawal of '+naira(amt)+' submitted','info');
+  setTimeout(()=>toast('Funds arriving within 30 minutes','ok'), 1400);
+}
+</script>
 </body>
 </html>

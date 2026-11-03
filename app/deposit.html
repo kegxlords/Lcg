@@ -1,111 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LCG - Deposit</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — Deposit</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <h2 style="margin-bottom: var(--spacing-lg);">Make a Deposit</h2>
-
-    <div class="card fade-in">
-      <h3 style="margin-bottom: var(--spacing-md); color: var(--primary);"><i class="fa-solid fa-building-columns"></i> Company Bank Details</h3>
-      <div id="bank-details" style="margin-bottom: var(--spacing-lg);">
-        <div style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading...</div>
-      </div>
-    </div>
-
-    <form id="deposit-form" class="card fade-in">
-      <div class="form-group">
-        <label class="form-label">Amount (₦)</label>
-        <input type="number" id="amount" class="input" placeholder="Min. 1000" required min="1000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Sender Name (as on bank app)</label>
-        <input type="text" id="sender_name" class="input" placeholder="John Doe" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Payment Method</label>
-        <select id="payment_method" class="input">
-          <option value="bank_transfer">Bank Transfer</option>
-          <option value="opay">Opay</option>
-          <option value="palmpay">PalmPay</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Transaction Reference (Optional)</label>
-        <input type="text" id="proof_ref" class="input" placeholder="e.g. TRF123456789">
-      </div>
-      <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
-        <i class="fa-solid fa-paper-plane"></i> Submit Deposit
-      </button>
-    </form>
+<div class="app" id="app"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+let selMethod = 'card';
+let selAmt = 0;
+const methods = [
+  { id: 'card', name: 'Debit / Credit card', sub: 'Visa, Mastercard, Verve · Instant', tone: 'jade', sym: '💳' },
+  { id: 'bank', name: 'Bank transfer', sub: 'GTBank, Access, Zenith · 5 min', tone: 'gold', sym: '🏦' },
+  { id: 'ussd', name: 'USSD', sub: '*737# · Quick code', tone: 'violet', sym: '📲' },
+  { id: 'crypto', name: 'USDT (crypto)', sub: 'TRC20 · ~3 min', tone: 'rose', sym: '◈' },
+];
+const chips = [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000];
+app.innerHTML = `
+${topbarHTML('me')}
+<main class="page page-enter">
+  <div class="page-head">
+    <h1>Deposit</h1>
+    <p>Funds are credited instantly and earn from day one.</p>
   </div>
 
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell } from '/assets/js/components.js';
-    import { supabase } from '/assets/js/lcg-client.js';
+  <div class="amt-display card">
+    <div class="lbl">Deposit amount</div>
+    <div class="val" id="amtVal"><span style="opacity:0.5;">₦</span>0</div>
+    <div class="small muted">Min ₦1,000 · No maximum</div>
+  </div>
 
-    const user = await requireAuth();
-    if (user) {
-      await loadShell();
+  <div class="amt-chips" id="chips">
+    ${chips.map((c,i)=>`<button class="amt-chip" data-amt="${c}" onclick="pickAmt(${c},this)">${c>=1000?(c/1000)+'K':'₦'+c}</button>`).join('')}
+  </div>
 
-    // Load bank details
-    const { data: settings } = await supabase.from('site_settings').select('key, value');
-    const bankDetails = {};
-    settings?.forEach(s => bankDetails[s.key] = s.value);
-    
-    document.getElementById('bank-details').innerHTML = `
-      <div style="background: var(--bg); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-sm);">
-        <div style="font-size: 0.8rem; color: var(--text-muted);">Bank Name</div>
-        <div style="font-weight: 700;">${bankDetails['deposit_bank_name'] || 'Not set'}</div>
-      </div>
-      <div style="background: var(--bg); padding: var(--spacing-md); border-radius: var(--radius-md); margin-bottom: var(--spacing-sm);">
-        <div style="font-size: 0.8rem; color: var(--text-muted);">Account Number</div>
-        <div style="font-weight: 700; font-family: 'Sora';">${bankDetails['deposit_account_number'] || 'Not set'}</div>
-      </div>
-      <div style="background: var(--bg); padding: var(--spacing-md); border-radius: var(--radius-md);">
-        <div style="font-size: 0.8rem; color: var(--text-muted);">Account Name</div>
-        <div style="font-weight: 700;">${bankDetails['deposit_account_name'] || 'Not set'}</div>
-      </div>
-    `;
+  <div class="field">
+    <label for="custom">Or enter custom amount</label>
+    <div class="input-wrap">
+      <span class="lead" style="color:var(--jade-light);font-weight:600;left:16px;">₦</span>
+      <input class="input has-lead" id="custom" type="number" placeholder="0" min="1000" oninput="syncCustom(this)">
+    </div>
+  </div>
 
-    // Handle submit
-    document.getElementById('deposit-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting...';
+  <div class="section-head" style="margin-top:8px;"><h2>Payment method</h2></div>
+  <div style="display:flex;flex-direction:column;gap:10px;" id="methods">
+    ${methods.map(m=>`
+      <button class="method ${m.id==='card'?'on':''}" data-mid="${m.id}" onclick="pickMethod('${m.id}',this)">
+        <div class="ic-box ${m.tone}" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:rgba(255,255,255,0.04);">${m.sym}</div>
+        <div class="body">
+          <div class="t">${m.name}</div>
+          <div class="s">${m.sub}</div>
+        </div>
+        <div class="check on" style="${m.id==='card'?'':'opacity:0;'}" data-check="${m.id}"></div>
+      </button>
+    `).join('')}
+  </div>
 
-      const res = await fetch('/api/wallet?action=submitDeposit', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` 
-        },
-        body: JSON.stringify({
-          amount: document.getElementById('amount').value,
-          sender_name: document.getElementById('sender_name').value,
-          payment_method: document.getElementById('payment_method').value,
-          proof_ref: document.getElementById('proof_ref').value
-        })
-      });
+  <div class="card card-pad" style="background:rgba(16,185,129,0.05);border-color:rgba(52,211,153,0.18);">
+    <div class="flex gap-3 center">
+      <div class="ic-box jade" style="width:36px;height:36px;">${I.shield}</div>
+      <div class="small" style="color:var(--fg-soft);">Deposits above ₦50,000 unlock <b style="color:var(--jade-light);">priority withdrawals</b> and a bonus 0.5% on first payout.</div>
+    </div>
+  </div>
 
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Deposit';
-      } else {
-        alert('Deposit submitted successfully! Please wait for admin approval.');
-        window.location.href = '/app/wallet.html';
-      }
-      });
-    }
-  </script>
+  <button class="btn btn-jade btn-block" onclick="confirmDeposit()">${I.deposit} Confirm deposit</button>
+</main>
+${bottomNavHTML('me')}
+`;
+
+function pickAmt(v, el){
+  selAmt = v;
+  document.querySelectorAll('.amt-chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('custom').value = v;
+  document.getElementById('amtVal').innerHTML = '<span style="opacity:0.5;">₦</span>'+v.toLocaleString();
+}
+function syncCustom(input){
+  selAmt = parseInt(input.value)||0;
+  document.querySelectorAll('.amt-chip').forEach(c=>c.classList.remove('on'));
+  document.getElementById('amtVal').innerHTML = '<span style="opacity:0.5;">₦</span>'+selAmt.toLocaleString();
+}
+function pickMethod(id, el){
+  selMethod = id;
+  document.querySelectorAll('#methods .method').forEach(m=>m.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('[data-check]').forEach(c=>c.style.opacity='0');
+  document.querySelector('[data-check="'+id+'"]').style.opacity='1';
+}
+function confirmDeposit(){
+  if(selAmt < 1000){ toast('Minimum deposit is ₦1,000','err'); return; }
+  toast('Depositing ' + naira(selAmt) + ' via ' + methods.find(m=>m.id===selMethod).name + '…','info');
+  setTimeout(()=>toast('Deposit successful! Balance updated.','ok'), 1400);
+}
+</script>
 </body>
 </html>

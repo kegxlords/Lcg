@@ -1,126 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LCG - Wallet</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <style>
-    .balance-card {
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      border-radius: var(--radius-lg);
-      padding: var(--spacing-xl);
-      text-align: center;
-      margin-bottom: var(--spacing-lg);
-      color: var(--bg);
-    }
-    .balance-card h2 { font-size: 1rem; opacity: 0.9; margin-bottom: var(--spacing-xs); }
-    .balance-card .amount { font-family: 'Sora', sans-serif; font-size: 2.5rem; font-weight: 800; }
-    .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
-    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: var(--spacing-md); }
-    .tab { flex: 1; padding: var(--spacing-md); text-align: center; cursor: pointer; color: var(--text-muted); font-weight: 600; border-bottom: 2px solid transparent; }
-    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-    .list-item { display: flex; justify-content: space-between; align-items: center; padding: var(--spacing-md) 0; border-bottom: 1px solid var(--border); }
-    .list-item:last-child { border-bottom: none; }
-    .status-badge { padding: 4px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; }
-    .status-pending { background: rgba(255, 176, 32, 0.2); color: var(--warning); }
-    .status-approved { background: rgba(0, 224, 138, 0.2); color: var(--success); }
-    .status-rejected { background: rgba(255, 90, 90, 0.2); color: var(--danger); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — Wallet</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <div class="balance-card fade-in">
-      <h2>Available Balance</h2>
-      <div class="amount" id="balance-display">₦0.00</div>
-    </div>
+<div class="app" id="app"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+app.innerHTML = `
+${topbarHTML('me')}
+<main class="page page-enter">
+  <div class="page-head">
+    <h1>Wallet</h1>
+    <p>Balance, earnings, and full transaction history.</p>
+  </div>
 
-    <div class="action-buttons fade-in">
-      <a href="/app/deposit.html" class="btn btn-primary btn-block"><i class="fa-solid fa-arrow-down"></i> Deposit</a>
-      <a href="/app/withdraw.html" class="btn btn-gold btn-block"><i class="fa-solid fa-arrow-up"></i> Withdraw</a>
-    </div>
-
-    <div class="card fade-in">
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('transactions')">Transactions</div>
-        <div class="tab" onclick="switchTab('deposits')">Deposits</div>
-        <div class="tab" onclick="switchTab('withdrawals')">Withdrawals</div>
-      </div>
-      <div id="list-container">
-        <div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">
-          <i class="fa-solid fa-circle-notch fa-spin"></i> Loading...
-        </div>
-      </div>
+  <div class="hero-balance">
+    <div class="label">Total balance</div>
+    <div class="amount"><span class="cur">₦</span>17,600<span style="font-size:18px;color:var(--fg-muted);font-family:var(--f-body);font-weight:500;">.00</span></div>
+    <div class="sub-row">
+      <div class="sub"><div class="k">Available</div><div class="v">${naira(LCG.user.available)}</div></div>
+      <div class="sub"><div class="k">Earnings</div><div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div></div>
     </div>
   </div>
 
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell } from '/assets/js/components.js';
-    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+  <div class="grid-2">
+    <a href="deposit.html" class="btn btn-jade">${I.deposit} Deposit</a>
+    <a href="withdraw.html" class="btn btn-gold">${I.withdraw} Withdraw</a>
+  </div>
 
-    const user = await requireAuth();
-    if (user) {
-      await loadShell();
+  <div class="stat-row">
+    <div class="stat lux">
+      <div class="k">${I.arrowDown} Total deposited</div>
+      <div class="v">${nairaShort(120000)}</div>
+      <div class="delta up">▲ Lifetime</div>
+    </div>
+    <div class="stat lux">
+      <div class="k">${I.arrowUp} Total withdrawn</div>
+      <div class="v">${nairaShort(93000)}</div>
+      <div class="delta muted">All time</div>
+    </div>
+  </div>
 
-      let currentTab = 'transactions';
-      let historyData = {};
+  <div class="tabs" data-tabs="tx">
+    <button class="tab active" data-cat="all">All</button>
+    <button class="tab" data-cat="in">Income</button>
+    <button class="tab" data-cat="out">Outgoing</button>
+  </div>
 
-    async function loadData() {
-      const res = await fetch('/api/wallet?action=getHistory', {
-        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
-      });
-      historyData = await res.json();
-      renderList();
-      
-      // Update balance in header
-      const balRes = await fetch('/api/wallet?action=getBalance', {
-        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
-      });
-      const { balance } = await balRes.json();
-      document.getElementById('balance-display').textContent = formatCurrency(balance);
-    }
-
-    window.switchTab = (tab) => {
-      currentTab = tab;
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
-      renderList();
-    };
-
-    function renderList() {
-      const container = document.getElementById('list-container');
-      let data = [];
-      let typeKey = '';
-
-      if (currentTab === 'transactions') { data = historyData.transactions || []; typeKey = 'type'; }
-      else if (currentTab === 'deposits') { data = historyData.deposits || []; typeKey = 'payment_method'; }
-      else { data = historyData.withdrawals || []; typeKey = 'bank_name'; }
-
-      if (data.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: var(--spacing-lg); color: var(--text-muted);">No records found</div>';
-        return;
-      }
-
-      container.innerHTML = data.map(item => `
-        <div class="list-item">
-          <div>
-            <div style="font-weight: 600; font-size: 0.9rem;">${item.description || item[typeKey] || 'Record'}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${new Date(item.created_at).toLocaleDateString()}</div>
+  <div class="card card-pad">
+    <div class="list">
+      ${LCG.transactions.map(t => `
+        <div class="row" data-cat="${t.dir}">
+          <div class="ic-box ${t.tone}">${I[t.ic]||I.coin}</div>
+          <div class="body">
+            <div class="t">${t.type}</div>
+            <div class="s">${t.sub}</div>
           </div>
-          <div style="text-align: right;">
-            <div style="font-family: 'Sora'; font-weight: 700;">${formatCurrency(item.amount)}</div>
-            <span class="status-badge status-${item.status}">${item.status}</span>
+          <div class="end">
+            <div class="amt ${t.dir==='in'?'up':'down'}">${t.dir==='in'?'+':'−'}${naira(t.amt)}</div>
+            <div class="ts">${t.ts}</div>
           </div>
         </div>
-      `).join('');
-    }
+      `).join('')}
+    </div>
+  </div>
 
-      loadData();
-    }
-  </script>
+  <button class="btn btn-ghost btn-block" onclick="toast('Showing latest 6 transactions','info');">${I.refresh} Load more</button>
+</main>
+${bottomNavHTML('me')}
+`;
+
+// patch tabs for tx filter (data-cat on row)
+setTimeout(()=>{
+  const tabs = document.querySelectorAll('[data-tabs="tx"] .tab');
+  const panel = document.querySelector('[data-tab-panel="tx"]') || document.querySelector('.list').closest('.card');
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');
+    const cat = t.dataset.cat;
+    document.querySelectorAll('.list .row').forEach(r=>{
+      r.style.display = (cat==='all'||r.dataset.cat===cat)?'flex':'none';
+    });
+  }));
+},50);
+</script>
 </body>
 </html>

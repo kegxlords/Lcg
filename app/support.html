@@ -1,201 +1,95 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LCG - Support</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="/assets/css/chat.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — Support</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <h2>Customer Service</h2>
-    
-    <!-- Ticket List View -->
-    <div id="ticket-list-view">
-      <button class="btn btn-primary btn-block" style="margin-bottom: var(--spacing-lg);" onclick="showCreateForm()">
-        <i class="fa-solid fa-plus"></i> New Ticket
-      </button>
-      <div id="tickets-container">
-        <div style="text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
-      </div>
-    </div>
+<div class="app" id="app"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+app.innerHTML = `
+${topbarHTML('me')}
+<main class="page page-enter">
+  <div class="page-head">
+    <h1>Support</h1>
+    <p>We're here 24/7. Choose how you'd like to reach us.</p>
+  </div>
 
-    <!-- Create Ticket Form -->
-    <div id="create-ticket-view" style="display: none;">
-      <button class="btn btn-secondary btn-sm" style="margin-bottom: 15px;" onclick="showTicketList()"><i class="fa-solid fa-arrow-left"></i> Back</button>
-      <div class="card">
-        <div class="form-group">
-          <label class="form-label">Subject</label>
-          <input type="text" id="new-subject" class="input" placeholder="Brief description of issue">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Message</label>
-          <textarea id="new-message" class="input" rows="4" placeholder="Describe your issue..."></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Attach Image (Optional)</label>
-          <input type="file" id="new-image" class="input" accept="image/*">
-        </div>
-        <button class="btn btn-primary btn-block" onclick="submitTicket()">Submit Ticket</button>
-      </div>
+  <!-- contact channels -->
+  <div class="grid-2">
+    <div class="card card-pad lux" style="text-align:center;cursor:pointer;" onclick="toast('Opening live chat…','info');">
+      <div class="ic-box jade" style="width:48px;height:48px;margin:0 auto 10px;border-radius:14px;">${I.service}</div>
+      <div style="font-weight:600;font-size:14px;">Live chat</div>
+      <div class="small muted" style="margin-top:2px;">Avg. reply &lt; 2 min</div>
+      <span class="badge jade" style="margin-top:8px;">● ONLINE</span>
     </div>
+    <div class="card card-pad lux" style="text-align:center;cursor:pointer;" onclick="toast('Opening ticket form…','info');">
+      <div class="ic-box gold" style="width:48px;height:48px;margin:0 auto 10px;border-radius:14px;">${I.ticket}</div>
+      <div style="font-weight:600;font-size:14px;">Submit ticket</div>
+      <div class="small muted" style="margin-top:2px;">Reply within 4h</div>
+    </div>
+  </div>
 
-    <!-- Chat View -->
-    <div id="chat-view" style="display: none;">
-      <div class="chat-container">
-        <div class="chat-header">
-          <button class="btn btn-secondary btn-sm" onclick="showTicketList()"><i class="fa-solid fa-arrow-left"></i></button>
-          <span id="chat-subject" style="font-weight: 700;">Ticket Subject</span>
-          <span id="chat-status" class="status-badge status-approved">Open</span>
+  <!-- contact methods -->
+  <div class="card card-pad">
+    <div class="list">
+      <a href="#" class="row" onclick="toast('Email copied','ok');copyText('help@lcg.io');return false;">
+        <div class="ic-box">${I.mail}</div>
+        <div class="body"><div class="t">Email</div><div class="s">help@lcg.io</div></div>
+        <div class="end"><span class="badge muted">COPY</span></div>
+      </a>
+      <a href="#" class="row" onclick="toast('Phone copied','ok');copyText('+234700LCGHELP');return false;">
+        <div class="ic-box">${I.phone}</div>
+        <div class="body"><div class="t">Hotline</div><div class="s">+234 700 LCG HELP</div></div>
+        <div class="end"><span class="badge muted">COPY</span></div>
+      </a>
+      <a href="#" class="row" onclick="toast('WhatsApp opening…','info');return false;">
+        <div class="ic-box jade"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.2-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.3 0-.5l-.9-2.1c-.2-.5-.4-.5-.6-.5h-.6c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.2s.9 2.6 1.1 2.7c.1.2 1.9 2.9 4.6 4 .6.3 1.1.4 1.5.5.6.2 1.2.2 1.6.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.5-.3z"/><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2z"/></svg></div>
+        <div class="body"><div class="t">WhatsApp</div><div class="s">+234 803 ••• 0001</div></div>
+        <div class="end"><span class="badge jade">● ONLINE</span></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section-head"><h2>Frequently asked</h2></div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    ${LCG.faqs.map(f => `
+      <div class="faq">
+        <div class="q">
+          <span>${f.q}</span>
+          <span class="ic">${I.chevronDown}</span>
         </div>
-        <div class="chat-messages" id="chat-messages">
-          <!-- Messages injected here -->
-        </div>
-        <div class="chat-input-area">
-          <label for="chat-image" class="btn btn-secondary btn-sm" style="margin:0;"><i class="fa-solid fa-image"></i></label>
-          <input type="file" id="chat-image" style="display: none;" accept="image/*" onchange="previewImage(this)">
-          <textarea id="chat-input" placeholder="Type a message..." rows="1"></textarea>
-          <button class="btn btn-primary btn-sm" onclick="sendChatMessage()"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
+        <div class="a">${f.a}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- risk notice -->
+  <div class="card card-pad" style="background:rgba(244,63,94,0.05);border-color:rgba(244,63,94,0.18);">
+    <div class="flex gap-3" style="align-items:flex-start;">
+      <div class="ic-box rose" style="width:36px;height:36px;flex-shrink:0;">${I.shield}</div>
+      <div>
+        <div style="font-weight:600;font-size:14px;color:#fb7185;">Security reminder</div>
+        <div class="small muted" style="margin-top:4px;line-height:1.6;">LCG staff will never ask for your password, OTP, or full card number. Report any suspicious contact via the official channels above. Always verify the URL is <b style="color:var(--fg);">lcg.io</b>.</div>
       </div>
     </div>
   </div>
 
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell } from '/assets/js/components.js';
-    import { supabase } from '/assets/js/lcg-client.js';
-    import { uploadImage, renderMessage } from '/assets/js/chat.js';
-
-    const user = await requireAuth();
-    if (!user) return;
-    await loadShell();
-
-    let currentTicketId = null;
-    let pendingImage = null;
-
-    const apiCall = async (action, method = 'GET', body = null) => {
-      const opts = {
-        method,
-        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
-      };
-      if (body) {
-        opts.headers['Content-Type'] = 'application/json';
-        opts.body = JSON.stringify(body);
-      }
-      const res = await fetch(`/api/support?action=${action}`, opts);
-      return await res.json();
-    };
-
-    // Views
-    window.showTicketList = () => {
-      document.getElementById('ticket-list-view').style.display = 'block';
-      document.getElementById('create-ticket-view').style.display = 'none';
-      document.getElementById('chat-view').style.display = 'none';
-      currentTicketId = null;
-      loadTickets();
-    };
-
-    window.showCreateForm = () => {
-      document.getElementById('ticket-list-view').style.display = 'none';
-      document.getElementById('create-ticket-view').style.display = 'block';
-    };
-
-    function openChat(ticket) {
-      currentTicketId = ticket.id;
-      document.getElementById('ticket-list-view').style.display = 'none';
-      document.getElementById('chat-view').style.display = 'block';
-      document.getElementById('chat-subject').textContent = ticket.subject;
-      document.getElementById('chat-status').textContent = ticket.status;
-      loadMessages();
-    }
-
-    // Load Tickets
-    async function loadTickets() {
-      const data = await apiCall('getTickets');
-      const container = document.getElementById('tickets-container');
-      if (data.tickets.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No tickets yet.</div>';
-        return;
-      }
-      container.innerHTML = data.tickets.map(t => `
-        <div class="ticket-list-item" onclick='openChat(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
-          <div>
-            <div style="font-weight: 600;">${t.subject}</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">${new Date(t.created_at).toLocaleDateString()}</div>
-          </div>
-          <div><span class="status-dot ${t.status}"></span>${t.status}</div>
-        </div>
-      `).join('');
-    }
-
-    // Submit New Ticket
-    window.submitTicket = async () => {
-      const subject = document.getElementById('new-subject').value;
-      const message = document.getElementById('new-message').value;
-      const fileInput = document.getElementById('new-image');
-      
-      if (!subject || !message) return alert('Subject and message are required');
-
-      let imageUrl = null;
-      if (fileInput.files[0]) {
-        // We need a temp ID for the upload, we'll use Date.now()
-        imageUrl = await uploadImage(fileInput.files[0], `temp_${Date.now()}`);
-      }
-
-      const res = await apiCall('createTicket', 'POST', { subject, message, image_url: imageUrl });
-      if (res.success) {
-        alert('Ticket created!');
-        showTicketList();
-      } else {
-        alert(res.error);
-      }
-    };
-
-    // Load Messages
-    async function loadMessages() {
-      if (!currentTicketId) return;
-      const data = await apiCall(`getMessages&ticket_id=${currentTicketId}`);
-      const container = document.getElementById('chat-messages');
-      container.innerHTML = data.messages.map(renderMessage).join('');
-      container.scrollTop = container.scrollHeight;
-    }
-
-    // Image Preview
-    window.previewImage = (input) => {
-      if (input.files && input.files[0]) {
-        pendingImage = input.files[0];
-      }
-    };
-
-    // Send Message
-    window.sendChatMessage = async () => {
-      const input = document.getElementById('chat-input');
-      const message = input.value.trim();
-      if (!message && !pendingImage) return;
-
-      let imageUrl = null;
-      if (pendingImage) {
-        imageUrl = await uploadImage(pendingImage, currentTicketId);
-        pendingImage = null;
-        document.getElementById('chat-image').value = ''; // reset
-      }
-
-      const res = await apiCall('sendMessage', 'POST', { ticket_id: currentTicketId, message, image_url: imageUrl });
-      if (res.success) {
-        input.value = '';
-        loadMessages();
-      } else {
-        alert(res.error);
-      }
-    };
-
-    // Expose openChat to window for inline onclick
-    window.openChat = openChat;
-
-    loadTickets();
-  </script>
+  <div class="foot-mini">
+    Response times apply to business hours (WAT 8am–10pm).<br>
+    Off-hours emergencies: use WhatsApp.<br>
+    © 2026 LCG · v2.4.0
+  </div>
+</main>
+${bottomNavHTML('me')}
+`;
+</script>
 </body>
 </html>

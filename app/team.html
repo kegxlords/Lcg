@@ -1,114 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LCG - My Team</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <style>
-    .ref-card { background: linear-gradient(135deg, var(--primary-dim), var(--gold-dim)); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-lg); text-align: center; margin-bottom: var(--spacing-lg); }
-    .ref-code { font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--gold); letter-spacing: 4px; margin: var(--spacing-md) 0; }
-    .share-btns { display: flex; gap: var(--spacing-sm); justify-content: center; margin-top: var(--spacing-md); }
-    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-sm); margin-bottom: var(--spacing-lg); }
-    .stat-box { background: var(--surface); padding: var(--spacing-md); border-radius: var(--radius-md); text-align: center; border: 1px solid var(--border); }
-    .stat-box strong { display: block; font-family: 'Sora'; font-size: 1.2rem; color: var(--primary); margin-bottom: 4px; }
-    .stat-box span { font-size: 0.75rem; color: var(--text-muted); }
-    .downline-item { display: flex; justify-content: space-between; padding: var(--spacing-md) 0; border-bottom: 1px solid var(--border); }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#060907">
+<title>LCG — My Team</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
-  <div class="page-content" style="padding: var(--spacing-md);">
-    <h2>My Team</h2>
-    
-    <div class="ref-card fade-in">
-      <div style="font-size: 0.9rem; color: var(--text-muted);">Your Referral Code</div>
-      <div class="ref-code" id="ref-code">LOADING</div>
-      <button class="btn btn-primary btn-sm" onclick="copyCode()"><i class="fa-regular fa-copy"></i> Copy Code</button>
-      
-      <div class="share-btns">
-        <button class="btn btn-secondary btn-sm" onclick="shareWhatsApp()"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
-        <button class="btn btn-secondary btn-sm" onclick="shareTelegram()"><i class="fa-brands fa-telegram"></i> Telegram</button>
+<div class="app" id="app"></div>
+<script src="../assets/js/app.js"></script>
+<script>
+const app = document.getElementById('app');
+const teamBonus = LCG.team.reduce((s,m)=>s+m.earned,0);
+app.innerHTML = `
+${topbarHTML('team')}
+<main class="page page-enter">
+  <div class="page-head">
+    <h1>My team</h1>
+    <p>Invite, track referrals, and grow your network.</p>
+  </div>
+
+  <!-- referral card -->
+  <div class="hero-balance" style="background:radial-gradient(120% 80% at 0% 0%,rgba(231,200,115,0.15),transparent 55%),radial-gradient(120% 80% at 100% 100%,rgba(16,185,129,0.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));">
+    <div class="label" style="color:var(--gold-light);">${I.gift} Your referral code</div>
+    <div class="flex between center" style="margin-top:8px;">
+      <div style="font-family:var(--f-display);font-size:24px;font-weight:700;letter-spacing:0.04em;">${LCG.user.referralCode}</div>
+      <button class="btn btn-ghost btn-sm" onclick="copyText('${LCG.user.referralCode}','Code')">${I.copy} Copy</button>
+    </div>
+    <div class="sub-row">
+      <div class="sub"><div class="k">Team size</div><div class="v">${LCG.user.teamSize}</div></div>
+      <div class="sub"><div class="k">Active</div><div class="v" style="color:var(--jade-light);">${LCG.team.filter(m=>m.active).length}</div></div>
+      <div class="sub"><div class="k">Total bonus</div><div class="v">${naira(teamBonus)}</div></div>
+    </div>
+  </div>
+
+  <!-- bonus structure -->
+  <div class="card card-pad">
+    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Bonus structure</div>
+    <div class="grid-2">
+      <div class="stat" style="padding:14px;">
+        <div class="k">Level 1 (direct)</div>
+        <div class="v text-jade-grad" style="font-size:22px;">10%</div>
+        <div class="small muted">of referral deposits</div>
       </div>
-    </div>
-
-    <div class="stat-grid fade-in">
-      <div class="stat-box"><strong id="stat-downlines">0</strong><span>Downlines</span></div>
-      <div class="stat-box"><strong id="stat-team-dep">₦0</strong><span>Team Deposit</span></div>
-      <div class="stat-box"><strong id="stat-spins">0</strong><span>Available Spins</span></div>
-    </div>
-
-    <div class="card fade-in">
-      <h3 style="margin-bottom: var(--spacing-md);">My Downlines</h3>
-      <div id="downlines-list">
-        <div style="text-align: center; color: var(--text-muted);"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+      <div class="stat" style="padding:14px;">
+        <div class="k">Level 2 (indirect)</div>
+        <div class="v text-gold-grad" style="font-size:22px;">3%</div>
+        <div class="small muted">of sub-referrals</div>
       </div>
     </div>
   </div>
 
-  <script type="module">
-    import { requireAuth } from '/assets/js/auth-guard.js';
-    import { loadShell } from '/assets/js/components.js';
-    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+  <!-- share actions -->
+  <div class="grid-2">
+    <button class="btn btn-jade" onclick="toast('Share link copied','ok');copyText('https://lcg.io/r/${LCG.user.referralCode}','Invite link')">${I.share} Share link</button>
+    <button class="btn btn-ghost" onclick="toast('QR code ready','info');">${I.qr} Show QR</button>
+  </div>
 
-    const user = await requireAuth();
-    if (!user) return;
-    await loadShell();
-
-    async function loadData() {
-      const token = (await supabase.auth.getSession()).data.session.access_token;
-      
-      // 1. Referral Info
-      const infoRes = await fetch('/api/referrals?action=getReferralInfo', { headers: { 'Authorization': `Bearer ${token}` } });
-      const info = await infoRes.json();
-      
-      document.getElementById('ref-code').textContent = info.referral_code || 'N/A';
-      document.getElementById('stat-downlines').textContent = info.active_downlines;
-      document.getElementById('stat-team-dep').textContent = formatCurrency(info.team_deposit);
-      document.getElementById('stat-spins').textContent = info.available_spins;
-
-      // 2. Downlines
-      const downRes = await fetch('/api/referrals?action=getDownlines', { headers: { 'Authorization': `Bearer ${token}` } });
-      const { downlines } = await downRes.json();
-      
-      const list = document.getElementById('downlines-list');
-      if (downlines.length === 0) {
-        list.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No downlines yet. Share your code!</div>';
-      } else {
-        list.innerHTML = downlines.map(d => `
-          <div class="downline-item">
-            <div>
-              <div style="font-weight: 600;">${d.full_name || 'Anonymous'}</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted);">${d.email}</div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.8rem; color: var(--text-muted);">Joined</div>
-              <div style="font-size: 0.8rem;">${new Date(d.created_at).toLocaleDateString()}</div>
-            </div>
+  <!-- members -->
+  <div class="section-head"><h2>Team members</h2><span class="small muted">${LCG.team.length} of ${LCG.user.teamSize}</span></div>
+  <div class="card card-pad">
+    <div class="list">
+      ${LCG.team.map(m => `
+        <div class="row">
+          <div class="avatar ${m.tone}" style="width:38px;height:38px;font-size:14px;">${m.avatar}</div>
+          <div class="body">
+            <div class="t">${m.name} ${m.active?'<span class="dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 6px var(--jade-light);margin-left:4px;vertical-align:middle;"></span>':''}</div>
+            <div class="s">${m.uid} · ${m.tier} · joined ${m.joined}</div>
           </div>
-        `).join('');
-      }
-    }
+          <div class="end">
+            <div class="amt up">+${naira(m.earned)}</div>
+            <div class="ts">${m.active?'Active':'Inactive'}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
 
-    window.copyCode = () => {
-      const code = document.getElementById('ref-code').textContent;
-      navigator.clipboard.writeText(code);
-      alert('Code copied!');
-    };
-
-    window.shareWhatsApp = () => {
-      const code = document.getElementById('ref-code').textContent;
-      const text = encodeURIComponent(`Join LCG and start earning daily! Use my referral code: ${code}`);
-      window.open(`https://wa.me/?text=${text}`, '_blank');
-    };
-
-    window.shareTelegram = () => {
-      const code = document.getElementById('ref-code').textContent;
-      const text = encodeURIComponent(`Join LCG and start earning daily! Use my referral code: ${code}`);
-      window.open(`https://t.me/share/url?url=${window.location.origin}/register.html?ref=${code}&text=${text}`, '_blank');
-    };
-
-    loadData();
-  </script>
+  <div class="card card-pad lux" style="background:linear-gradient(160deg,rgba(231,200,115,0.08),rgba(255,255,255,0.02));border-color:rgba(231,200,115,0.18);">
+    <div class="flex gap-3 center">
+      <div class="ic-box gold" style="width:42px;height:42px;">${I.fire}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:14px;">Reach Gold +5 members</div>
+        <div class="small muted" style="margin-top:2px;">Unlock Platinum tier with 0.6% withdrawal fee.</div>
+        <div class="progress gold" style="margin-top:10px;"><i style="width:${Math.round(LCG.user.teamSize/80*100)}%;"></i></div>
+      </div>
+    </div>
+  </div>
+</main>
+${bottomNavHTML('team')}
+`;
+</script>
 </body>
 </html>
