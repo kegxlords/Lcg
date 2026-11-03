@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { copyFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath, URL } from 'node:url';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -22,7 +22,21 @@ const htmlPages = [
   'app/withdraw'
 ];
 
-export default defineConfig({
+const copyLegacyRenderer = {
+  name: 'copy-legacy-renderer',
+  apply: 'build',
+  async closeBundle() {
+    const outputDir = fileURLToPath(new URL('./dist/assets/js/', import.meta.url));
+    await mkdir(outputDir, { recursive: true });
+    await copyFile(
+      fileURLToPath(new URL('./assets/js/app.js', import.meta.url)),
+      `${outputDir}app.js`
+    );
+  }
+};
+
+export default {
+  plugins: [copyLegacyRenderer],
   build: {
     target: 'esnext',
     outDir: 'dist',
@@ -41,4 +55,4 @@ export default defineConfig({
       '@': root
     }
   }
-});
+};
