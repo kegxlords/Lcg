@@ -46,6 +46,7 @@ export default async function handler(req, res) {
       
       // Support
       case 'getTickets': return await getTickets(req, res);
+      case 'getTicketMessages': return await getTicketMessages(req, res);
       case 'replyToTicket': return await replyToTicket(req, res);
       
       // Settings
@@ -303,12 +304,26 @@ async function getUnlockedVIPs(res) {
 // ==========================================
 async function getTickets(req, res) {
   const status = req.query.status || 'open';
-  const query = supabaseAdmin.from('support_tickets').select('*, profiles(email)').order('created_at', { ascending: false });
+  const query = supabaseAdmin.from('support_tickets').select('*, profiles(email, full_name)').order('created_at', { ascending: false });
   if (status !== 'all') query.eq('status', status);
   
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ tickets: data || [] });
+}
+
+async function getTicketMessages(req, res) {
+  const ticketId = req.query.ticket_id;
+  if (!ticketId) return res.status(400).json({ error: 'Ticket ID required' });
+
+  const { data, error } = await supabaseAdmin
+    .from('support_messages')
+    .select('*')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true });
+  
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ messages: data || [] });
 }
 
 async function replyToTicket(req, res) {
