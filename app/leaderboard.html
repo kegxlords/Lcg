@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCG - Leaderboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <style>
+    .podium { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin-bottom: 30px; height: 200px; }
+    .podium-place { width: 30%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 10px; text-align: center; position: relative; }
+    .podium-place.first { height: 100%; border-color: var(--gold); background: linear-gradient(180deg, var(--gold-dim), var(--surface)); }
+    .podium-place.second { height: 80%; border-color: #C0C0C0; }
+    .podium-place.third { height: 60%; border-color: #CD7F32; }
+    
+    .rank-badge { position: absolute; top: -15px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-family: 'Sora'; color: var(--bg); }
+    .first .rank-badge { background: var(--gold); }
+    .second .rank-badge { background: #C0C0C0; }
+    .third .rank-badge { background: #CD7F32; }
+    
+    .podium-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .podium-amount { font-family: 'Sora'; font-weight: 800; color: var(--primary); font-size: 0.85rem; }
+
+    .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 10px; }
+    .list-rank { width: 30px; font-family: 'Sora'; font-weight: 800; color: var(--text-muted); }
+    .list-info { flex: 1; }
+    .list-name { font-weight: 700; font-size: 0.9rem; }
+    .list-code { font-size: 0.75rem; color: var(--text-muted); }
+    .list-amount { font-family: 'Sora'; font-weight: 800; color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="page-content" style="padding: var(--spacing-md);">
+    <h2 style="text-align: center; margin-bottom: 30px;">🏆 Top Influencers</h2>
+
+    <div id="podium-container" class="podium fade-in">
+      <!-- Top 3 injected here -->
+    </div>
+
+    <div id="list-container" class="fade-in">
+      <!-- Ranks 4-10 injected here -->
+    </div>
+  </div>
+
+  <script type="module">
+    import { requireAuth } from '/assets/js/auth-guard.js';
+    import { loadShell } from '/assets/js/components.js';
+    import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
+
+    const user = await requireAuth();
+    if (!user) return;
+    await loadShell();
+
+    async function loadLeaderboard() {
+      const token = (await supabase.auth.getSession()).data.session.access_token;
+      const res = await fetch('/api/leaderboard', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      renderLeaderboard(data.leaderboard || []);
+    }
+
+    function renderLeaderboard(users) {
+      if (users.length === 0) {
+        document.getElementById('podium-container').innerHTML = '<p style="text-align:center; color: var(--text-muted); width:100%;">No data yet.</p>';
+        return;
+      }
+
+      // Podium (Top 3)
+      const podium = document.getElementById('podium-container');
+      const top3 = users.slice(0, 3);
+      // Order for visual podium: 2nd, 1st, 3rd
+      const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean);
+      const rankClasses = ['second', 'first', 'third'];
+      const rankNums = [2, 1, 3];
+
+      podium.innerHTML = podiumOrder.map((u, i) => {
+        if (!u) return `<div class="podium-place ${rankClasses[i]}"></div>`;
+        return `
+          <div class="podium-place ${rankClasses[i]}">
+            <div class="rank-badge">${rankNums[i]}</div>
+            <div class="podium-name">${u.full_name || 'Anonymous'}</div>
+            <div class="podium-amount">${formatCurrency(u.total_team_deposit)}</div>
+          </div>
+        `;
+      }).join('');
+
+      // List (4-10)
+      const list = document.getElementById('list-container');
+      const rest = users.slice(3);
+      list.innerHTML = rest.map((u, i) => `
+        <div class="list-item">
+          <div class="list-rank">#${i + 4}</div>
+          <div class="list-info">
+            <div class="list-name">${u.full_name || 'Anonymous'}</div>
+            <div class="list-code">Code: ${u.referral_code}</div>
+          </div>
+          <div class="list-amount">${formatCurrency(u.total_team_deposit)}</div>
+        </div>
+      `).join('');
+    }
+
+    loadLeaderboard();
+  </script>
+</body>
+</html>
