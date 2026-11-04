@@ -2,94 +2,162 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Support</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.support-form { display:flex; flex-direction:column; gap:14px; }
+.ticket-list { display:flex; flex-direction:column; gap:9px; }
+.ticket-item { width:100%; padding:14px; text-align:left; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); transition:border-color .2s,background .2s; }
+.ticket-item:hover,.ticket-item[aria-current="true"] { border-color:rgba(52,211,153,.45); background:rgba(16,185,129,.07); }
+.ticket-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.ticket-subject { font-weight:600; overflow-wrap:anywhere; }
+.ticket-meta { display:flex; flex-wrap:wrap; gap:8px 14px; color:var(--fg-muted); font-size:12px; margin-top:7px; }
+.thread { display:flex; flex-direction:column; gap:10px; max-height:380px; overflow:auto; padding:2px; }
+.message { max-width:92%; padding:12px 14px; border:1px solid var(--border); border-radius:14px; background:var(--surface-2); overflow-wrap:anywhere; white-space:pre-wrap; }
+.message.user { align-self:flex-end; border-color:rgba(52,211,153,.25); background:rgba(16,185,129,.10); }
+.message.staff { align-self:flex-start; }
+.message-meta { font-size:10px; color:var(--fg-muted); margin-bottom:5px; }
+.ticket-list .data-state { padding:16px 4px; }
+@media (min-width:560px) { .page { max-width:650px; margin:0 auto; } }
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, escapeHTML, formatDate, showEmpty, showLoading, showPageError } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
+const { icons, bottomNavHTML, toast } = window.LCGUI;
 app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Support</h1>
-    <p>We're here 24/7. Choose how you'd like to reach us.</p>
-  </div>
+  <header class="topbar"><a href="dashboard.html" class="brand"><span class="logo-dot">L</span><span>LCG</span></a><span class="badge jade">${icons.service} Support tickets</span></header>
+  <main class="page page-enter">
+    <div class="page-head"><h1>Support</h1><p>Create a support ticket and review messages in your account.</p></div>
+    <section class="card card-pad" aria-labelledby="new-ticket-heading">
+      <div class="flex gap-3 center" style="margin-bottom:14px;"><div class="ic-box jade" style="width:42px;height:42px;">${icons.ticket}</div><div><h2 id="new-ticket-heading" style="font:600 16px var(--f-display);">New ticket</h2><p class="small muted">Add a subject and message to open a ticket.</p></div></div>
+      <form id="ticket-form" class="support-form">
+        <div class="field"><label for="ticket-subject">Subject</label><input class="input" id="ticket-subject" name="subject" maxlength="160" required placeholder="What do you need help with?"></div>
+        <div class="field"><label for="ticket-message">Message</label><textarea class="input" id="ticket-message" name="message" maxlength="5000" required placeholder="Describe the issue"></textarea></div>
+        <button class="btn btn-jade btn-block" id="create-button" type="submit">${icons.plus} Create ticket</button>
+        <p id="form-error" class="small" role="alert" style="color:#fb7185;"></p>
+      </form>
+    </section>
+    <section aria-labelledby="tickets-heading">
+      <div class="section-head" style="margin-bottom:10px;"><h2 id="tickets-heading">Your tickets</h2></div>
+      <div class="ticket-list" id="ticket-list">${showLoading(document.createElement('div'),'Loading your tickets…')}</div>
+    </section>
+    <section id="thread-section" class="card card-pad" hidden aria-labelledby="thread-heading">
+      <div class="flex between center" style="gap:10px;margin-bottom:14px;"><h2 id="thread-heading" style="font:600 16px var(--f-display);overflow-wrap:anywhere;">Ticket messages</h2><button class="btn btn-ghost btn-sm" id="close-thread" type="button" aria-label="Close ticket messages">Close</button></div>
+      <div id="thread-content">${showEmpty('Choose a ticket to view messages.')}</div>
+      <form id="reply-form" class="support-form" style="margin-top:14px;" hidden>
+        <div class="field"><label for="reply-message">Reply</label><textarea class="input" id="reply-message" name="message" maxlength="5000" required placeholder="Write a message"></textarea></div>
+        <button class="btn btn-ghost btn-block" id="reply-button" type="submit">${icons.arrowUp} Send message</button>
+        <p id="reply-error" class="small" role="alert" style="color:#fb7185;"></p>
+      </form>
+    </section>
+    <div id="page-error"></div>
+  </main>
+  ${bottomNavHTML('me')}`;
 
-  <!-- contact channels -->
-  <div class="grid-2">
-    <div class="card card-pad lux" style="text-align:center;cursor:pointer;" onclick="toast('Opening live chat…','info');">
-      <div class="ic-box jade" style="width:48px;height:48px;margin:0 auto 10px;border-radius:14px;">${I.service}</div>
-      <div style="font-weight:600;font-size:14px;">Live chat</div>
-      <div class="small muted" style="margin-top:2px;">Avg. reply &lt; 2 min</div>
-      <span class="badge jade" style="margin-top:8px;">● ONLINE</span>
-    </div>
-    <div class="card card-pad lux" style="text-align:center;cursor:pointer;" onclick="toast('Opening ticket form…','info');">
-      <div class="ic-box gold" style="width:48px;height:48px;margin:0 auto 10px;border-radius:14px;">${I.ticket}</div>
-      <div style="font-weight:600;font-size:14px;">Submit ticket</div>
-      <div class="small muted" style="margin-top:2px;">Reply within 4h</div>
-    </div>
-  </div>
+let tickets = [];
+let selectedTicketId = null;
+function renderTickets() {
+  const target = document.getElementById('ticket-list');
+  if (!tickets.length) { target.innerHTML = showEmpty('No support tickets yet. Use the form above to create one.'); return; }
+  target.innerHTML = tickets.map((ticket)=>{
+    const subject = ticket.subject || 'Support ticket';
+    const status = ticket.status || 'Status unavailable';
+    const selected = String(ticket.id) === String(selectedTicketId);
+    return `<button class="ticket-item" type="button" data-ticket-id="${escapeHTML(ticket.id)}" aria-current="${selected?'true':'false'}"><div class="ticket-heading"><span class="ticket-subject">${escapeHTML(subject)}</span><span class="badge ${String(status).toLowerCase()==='open'?'jade':'muted'}">${escapeHTML(status)}</span></div><span class="ticket-meta"><span>Created ${escapeHTML(formatDate(ticket.created_at,{dateStyle:'medium',timeStyle:'short'}))}</span></span></button>`;
+  }).join('');
+  target.querySelectorAll('[data-ticket-id]').forEach((button)=>button.addEventListener('click',()=>openTicket(button.dataset.ticketId)));
+}
+function renderMessages(messages) {
+  const target = document.getElementById('thread-content');
+  if (!Array.isArray(messages) || messages.length === 0) { target.innerHTML = showEmpty('There are no messages on this ticket yet.'); return; }
+  target.innerHTML = `<div class="thread">${messages.map((item)=>{
+    const isUser = item.sender_type === 'user';
+    return `<article class="message ${isUser?'user':'staff'}"><div class="message-meta">${isUser?'You':escapeHTML(item.sender_type || 'Support')} · ${escapeHTML(formatDate(item.created_at,{dateStyle:'medium',timeStyle:'short'}))}</div><div>${escapeHTML(item.message)}</div></article>`;
+  }).join('')}</div>`;
+}
+async function loadTickets() {
+  const target = document.getElementById('ticket-list');
+  showLoading(target,'Loading your tickets…');
+  const result = await apiRequest('/api/support?action=getTickets');
+  tickets = Array.isArray(result.tickets) ? result.tickets : [];
+  renderTickets();
+}
+async function openTicket(ticketId) {
+  selectedTicketId = ticketId;
+  const section = document.getElementById('thread-section');
+  section.hidden = false;
+  document.getElementById('thread-heading').textContent = tickets.find((ticket)=>String(ticket.id)===String(ticketId))?.subject || 'Ticket messages';
+  document.getElementById('thread-content').innerHTML = showLoading(document.createElement('div'),'Loading messages…');
+  document.getElementById('reply-form').hidden = false;
+  document.getElementById('reply-error').textContent = '';
+  renderTickets();
+  section.scrollIntoView({behavior:'smooth',block:'start'});
+  try {
+    const result = await apiRequest(`/api/support?action=getMessages&ticket_id=${encodeURIComponent(ticketId)}`);
+    if (String(selectedTicketId) === String(ticketId)) renderMessages(result.messages);
+  } catch (error) {
+    document.getElementById('thread-content').innerHTML = '';
+    showPageError(document.getElementById('thread-content'),error,()=>openTicket(ticketId));
+  }
+}
 
-  <!-- contact methods -->
-  <div class="card card-pad">
-    <div class="list">
-      <a href="#" class="row" onclick="toast('Email copied','ok');copyText('help@lcg.io');return false;">
-        <div class="ic-box">${I.mail}</div>
-        <div class="body"><div class="t">Email</div><div class="s">help@lcg.io</div></div>
-        <div class="end"><span class="badge muted">COPY</span></div>
-      </a>
-      <a href="#" class="row" onclick="toast('Phone copied','ok');copyText('+234700LCGHELP');return false;">
-        <div class="ic-box">${I.phone}</div>
-        <div class="body"><div class="t">Hotline</div><div class="s">+234 700 LCG HELP</div></div>
-        <div class="end"><span class="badge muted">COPY</span></div>
-      </a>
-      <a href="#" class="row" onclick="toast('WhatsApp opening…','info');return false;">
-        <div class="ic-box jade"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.2-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.3 0-.5l-.9-2.1c-.2-.5-.4-.5-.6-.5h-.6c-.2 0-.5.1-.7.3-.3.3-.9.9-.9 2.2s.9 2.6 1.1 2.7c.1.2 1.9 2.9 4.6 4 .6.3 1.1.4 1.5.5.6.2 1.2.2 1.6.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.5-.3z"/><path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.3A10 10 0 1 0 12 2z"/></svg></div>
-        <div class="body"><div class="t">WhatsApp</div><div class="s">+234 803 ••• 0001</div></div>
-        <div class="end"><span class="badge jade">● ONLINE</span></div>
-      </a>
-    </div>
-  </div>
+const form = document.getElementById('ticket-form');
+form.addEventListener('submit',async(event)=>{
+  event.preventDefault();
+  const button = document.getElementById('create-button');
+  const errorTarget = document.getElementById('form-error');
+  const subject = form.elements.subject.value.trim();
+  const message = form.elements.message.value.trim();
+  errorTarget.textContent = '';
+  if (!subject || !message) { errorTarget.textContent = 'Enter both a subject and a message.'; return; }
+  button.disabled = true;
+  try {
+    const result = await apiRequest('/api/support?action=createTicket',{method:'POST',body:{subject,message}});
+    form.reset();
+    toast('Ticket created','ok');
+    await loadTickets();
+    if (result.ticket?.id) await openTicket(result.ticket.id);
+  } catch (error) { errorTarget.textContent = error.message || 'Could not create the ticket.'; }
+  finally { button.disabled = false; }
+});
 
-  <!-- FAQ -->
-  <div class="section-head"><h2>Frequently asked</h2></div>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    ${LCG.faqs.map(f => `
-      <div class="faq">
-        <div class="q">
-          <span>${f.q}</span>
-          <span class="ic">${I.chevronDown}</span>
-        </div>
-        <div class="a">${f.a}</div>
-      </div>
-    `).join('')}
-  </div>
+document.getElementById('reply-form').addEventListener('submit',async(event)=>{
+  event.preventDefault();
+  const button = document.getElementById('reply-button');
+  const errorTarget = document.getElementById('reply-error');
+  const message = event.currentTarget.elements.message.value.trim();
+  errorTarget.textContent = '';
+  if (!message || !selectedTicketId) { errorTarget.textContent = 'Enter a message before sending.'; return; }
+  button.disabled = true;
+  try {
+    await apiRequest('/api/support?action=sendMessage',{method:'POST',body:{ticket_id:selectedTicketId,message}});
+    event.currentTarget.reset();
+    toast('Message sent','ok');
+    await openTicket(selectedTicketId);
+  } catch (error) { errorTarget.textContent = error.message || 'Could not send the message.'; }
+  finally { button.disabled = false; }
+});
+document.getElementById('close-thread').addEventListener('click',()=>{
+  document.getElementById('thread-section').hidden = true;
+  selectedTicketId = null;
+  renderTickets();
+});
 
-  <!-- risk notice -->
-  <div class="card card-pad" style="background:rgba(244,63,94,0.05);border-color:rgba(244,63,94,0.18);">
-    <div class="flex gap-3" style="align-items:flex-start;">
-      <div class="ic-box rose" style="width:36px;height:36px;flex-shrink:0;">${I.shield}</div>
-      <div>
-        <div style="font-weight:600;font-size:14px;color:#fb7185;">Security reminder</div>
-        <div class="small muted" style="margin-top:4px;line-height:1.6;">LCG staff will never ask for your password, OTP, or full card number. Report any suspicious contact via the official channels above. Always verify the URL is <b style="color:var(--fg);">lcg.io</b>.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="foot-mini">
-    Response times apply to business hours (WAT 8am–10pm).<br>
-    Off-hours emergencies: use WhatsApp.<br>
-    © 2026 LCG · v2.4.0
-  </div>
-</main>
-${bottomNavHTML('me')}
-`;
+async function loadPage() {
+  app.dataset.liveReady = 'false';
+  const target = document.getElementById('page-error');
+  target.innerHTML = '';
+  try { await loadTickets(); app.dataset.liveReady = 'true'; }
+  catch (error) { showPageError(target,error,loadPage); document.getElementById('ticket-list').innerHTML = showEmpty('Your tickets could not be loaded.'); app.dataset.liveReady = 'true'; }
+}
+await loadPage();
 </script>
 </body>
 </html>

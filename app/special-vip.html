@@ -2,97 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — VIP Program</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.vip-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(125px,1fr)); gap:10px; }
+.vip-summary .stat { min-width:0; }
+.vip-summary .v { font-size:17px; overflow-wrap:anywhere; }
+.tier-card { padding:18px; }
+.tier-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.tier-title { font:600 17px/1.3 var(--f-display); overflow-wrap:anywhere; }
+.tier-id { color:var(--fg-muted); font-size:12px; margin-top:4px; overflow-wrap:anywhere; }
+.tier-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+.tier-field { min-width:0; }
+.tier-field .key { font-size:10px; color:var(--fg-muted); text-transform:uppercase; letter-spacing:.05em; overflow-wrap:anywhere; }
+.tier-field .value { margin-top:3px; font-size:13px; color:var(--fg-soft); overflow-wrap:anywhere; word-break:break-word; }
+.tier-grid { display:flex; flex-direction:column; gap:12px; }
+@media (min-width:560px) { .page { max-width:650px; margin:0 auto; } }
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, escapeHTML, formatDate, money, showEmpty, showLoading, showPageError } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const cur = LCG.tiers.find(t=>t.current);
-const next = LCG.tiers.find(t=>t.level===cur.level+1);
+const { icons, bottomNavHTML } = window.LCGUI;
 app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>VIP program</h1>
-    <p>Unlock lower fees, higher limits, and exclusive perks.</p>
-  </div>
+  <header class="topbar"><a href="dashboard.html" class="brand"><span class="logo-dot">L</span><span>LCG</span></a><span class="badge gold">${icons.vip} VIP</span></header>
+  <main class="page page-enter">
+    <div class="page-head"><h1>VIP program</h1><p>Tier details and account figures supplied by your account data.</p></div>
+    <section id="vip-stats" class="card card-pad" aria-label="Your tier statistics">${showLoading(document.createElement('div'),'Loading account statistics…')}</section>
+    <section aria-labelledby="tiers-heading">
+      <div class="section-head" style="margin-bottom:10px;"><h2 id="tiers-heading">Available tiers</h2></div>
+      <div id="tiers-list">${showLoading(document.createElement('div'),'Loading tier details…')}</div>
+    </section>
+    <div id="page-error"></div>
+  </main>
+  ${bottomNavHTML('me')}`;
 
-  <!-- current tier -->
-  <div class="vip-card ${cur.color} current">
-    <div class="flex between center">
-      <div>
-        <div class="level">Current tier</div>
-        <div class="name shimmer">${cur.name}</div>
-      </div>
-      <div style="font-size:42px;line-height:1;">${cur.level===1?'🥈':cur.level===2?'👑':cur.level===3?'💎':'◆'}</div>
-    </div>
-    <div class="grid-2" style="margin-top:16px;">
-      <div class="stat" style="padding:12px;background:rgba(255,255,255,0.05);"><div class="k">Daily limit</div><div class="v" style="font-size:16px;">${nairaShort(cur.dailyLimit)}</div></div>
-      <div class="stat" style="padding:12px;background:rgba(255,255,255,0.05);"><div class="k">Withdrawal fee</div><div class="v" style="font-size:16px;color:var(--jade-light);">${cur.fee}%</div></div>
-    </div>
-  </div>
-
-  ${next ? `
-  <div class="card card-pad lux">
-    <div class="flex between center">
-      <div>
-        <div class="small muted">Next: ${next.name}</div>
-        <div style="font-weight:600;font-size:15px;margin-top:2px;">${next.req}</div>
-      </div>
-      <div style="font-family:var(--f-display);font-size:18px;font-weight:700;color:var(--gold-light);">${Math.round(LCG.user.teamSize/next.team*100)}%</div>
-    </div>
-    <div class="progress gold" style="margin-top:12px;"><i style="width:${Math.round(LCG.user.teamSize/next.team*100)}%;"></i></div>
-    <div class="flex between center small muted" style="margin-top:6px;">
-      <span>Team ${LCG.user.teamSize}/${next.team}</span>
-      <span>${LCG.user.invested>=1000000?'✓':nairaShort(next.req.includes('₦')?1000000:0)}</span>
-    </div>
-  </div>` : ''}
-
-  <!-- all tiers -->
-  <div class="section-head"><h2>All tiers</h2></div>
-  <div style="display:flex;flex-direction:column;gap:14px;">
-    ${LCG.tiers.map(t => `
-      <div class="vip-card ${t.color} ${t.current?'current':''}">
-        <div class="flex between center">
-          <div>
-            <div class="level">Tier ${t.level}</div>
-            <div class="name">${t.name}</div>
-          </div>
-          <div class="avatar ${t.color==='silver'?'silver':'gold'}" style="width:44px;height:44px;font-size:16px;">${t.level===1?'S':t.level===2?'G':t.level===3?'P':'D'}</div>
-        </div>
-        <div class="flex between center" style="margin-top:14px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">
-          <div class="small"><span class="muted">Fee</span> <b style="color:var(--jade-light);">${t.fee}%</b></div>
-          <div class="small"><span class="muted">Limit</span> <b>${nairaShort(t.dailyLimit)}</b></div>
-          <div class="small"><span class="muted">Team</span> <b>${t.team}+</b></div>
-        </div>
-        <ul class="perks">
-          ${t.perks.map(p=>`<li>${p}</li>`).join('')}
-        </ul>
-        ${t.current
-          ? `<div class="badge jade" style="margin-top:14px;">CURRENT</div>`
-          : `<button class="btn btn-ghost btn-sm btn-block" style="margin-top:14px;" onclick="toast('Reach the requirements to unlock','info');">Requirements</button>`}
-      </div>
-    `).join('')}
-  </div>
-
-  <div class="card card-pad" style="background:rgba(231,200,115,0.06);border-color:rgba(231,200,115,0.2);">
-    <div class="flex gap-3 center">
-      <div class="ic-box gold" style="width:42px;height:42px;">${I.sparkle}</div>
-      <div>
-        <div style="font-weight:600;font-size:14px;">VIP cashback</div>
-        <div class="small muted" style="margin-top:2px;">Earn up to 3% weekly cashback on all payouts. Credited every Monday.</div>
-      </div>
-    </div>
-  </div>
-</main>
-${bottomNavHTML('me')}
-`;
+function keyLabel(key) {
+  return String(key).replace(/_/g,' ').replace(/\b\w/g,(letter)=>letter.toUpperCase());
+}
+function scalar(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+function renderStats(stats) {
+  const target = document.getElementById('vip-stats');
+  if (!stats || typeof stats !== 'object') {
+    target.innerHTML = showEmpty('No tier statistics are available.');
+    return;
+  }
+  const fields = [
+    ['total_personal_deposit','Personal deposits', (v)=>money(v)],
+    ['total_team_deposit','Team deposits', (v)=>money(v)],
+    ['active_downlines','Active downlines', (v)=>String(v)]
+  ].filter(([key]) => stats[key] !== undefined && stats[key] !== null);
+  target.innerHTML = fields.length ? `<div class="small muted" style="margin-bottom:10px;">Account statistics</div><div class="vip-summary">${fields.map(([key,label,format])=>`<div class="stat"><div class="k">${escapeHTML(label)}</div><div class="v">${escapeHTML(format(stats[key]))}</div></div>`).join('')}</div>` : showEmpty('No tier statistics are available.');
+}
+function renderTiers(tiers) {
+  const target = document.getElementById('tiers-list');
+  if (!Array.isArray(tiers) || tiers.length === 0) {
+    target.innerHTML = showEmpty('No tier rows are available.');
+    return;
+  }
+  const excluded = new Set(['id','is_unlocked','unlock_data','user_stats']);
+  target.innerHTML = `<div class="tier-grid">${tiers.map((tier,index)=>{
+    const rawFields = Object.entries(tier || {}).filter(([key,value]) => !excluded.has(key) && value !== undefined && value !== null && typeof value !== 'object');
+    const title = tier.tier_name ?? tier.name ?? `Tier ${index + 1}`;
+    const identity = tier.id !== undefined ? `ID ${scalar(tier.id)}` : `Tier ${index + 1}`;
+    const unlocked = tier.is_unlocked === true;
+    const unlockedAt = tier.unlock_data?.unlocked_at;
+    return `<article class="card tier-card"><div class="tier-top"><div><h3 class="tier-title">${escapeHTML(title)}</h3><div class="tier-id">${escapeHTML(identity)}</div></div><span class="badge ${unlocked?'jade':'muted'}">${unlocked?'Unlocked':'Not unlocked'}</span></div>${rawFields.length ? `<div class="tier-fields">${rawFields.map(([key,value])=>`<div class="tier-field"><div class="key">${escapeHTML(keyLabel(key))}</div><div class="value">${escapeHTML(scalar(value))}</div></div>`).join('')}</div>` : `<p class="small muted" style="margin-top:14px;">No additional tier fields were provided.</p>`}${unlockedAt ? `<p class="small muted" style="margin-top:12px;">Unlocked ${escapeHTML(formatDate(unlockedAt,{dateStyle:'medium'}))}</p>` : ''}</article>`;
+  }).join('')}</div>`;
+}
+async function loadPage() {
+  app.dataset.liveReady = 'false';
+  const error = document.getElementById('page-error');
+  error.innerHTML = '';
+  showLoading(document.getElementById('vip-stats'),'Loading account statistics…');
+  showLoading(document.getElementById('tiers-list'),'Loading tier details…');
+  try {
+    const result = await apiRequest('/api/special-vip?action=getMyTiers');
+    const tiers = Array.isArray(result.tiers) ? result.tiers : [];
+    renderTiers(tiers);
+    renderStats(tiers.find((tier)=>tier?.user_stats)?.user_stats);
+    app.dataset.liveReady = 'true';
+  } catch (exception) {
+    showPageError(error,exception,loadPage);
+    document.getElementById('vip-stats').innerHTML = showEmpty('Account statistics could not be loaded.');
+    document.getElementById('tiers-list').innerHTML = showEmpty('Tier details could not be loaded.');
+    app.dataset.liveReady = 'true';
+  }
+}
+await loadPage();
 </script>
 </body>
 </html>

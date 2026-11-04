@@ -2,106 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Leaderboard</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end}.podium-item{text-align:center;min-width:0;padding:12px 6px;border-radius:16px;background:rgba(255,255,255,.025);border:1px solid var(--border)}.podium-item.first{padding-top:18px;background:linear-gradient(160deg,rgba(231,200,115,.11),rgba(255,255,255,.025));border-color:rgba(231,200,115,.2)}.podium-item .podium-name{font-weight:600;font-size:12px;margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.podium-item .podium-value{font-size:11px;color:var(--fg-muted);margin-top:3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.rank-list{display:flex;flex-direction:column;gap:8px}.rank-row{display:flex;align-items:center;gap:12px;min-width:0;padding:13px 14px;border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.025)}.rank-row.is-you{border-color:rgba(52,211,153,.34);background:rgba(16,185,129,.07)}.rank-number{flex:0 0 34px;height:34px;display:grid;place-items:center;border-radius:11px;background:var(--surface-2);font:700 14px var(--f-display);color:var(--fg-soft)}.rank-row .who{display:flex;align-items:center;gap:10px;min-width:0;flex:1}.rank-row .name{font-weight:600;font-size:14px;overflow-wrap:anywhere}.rank-row .rank-sub{font-size:11px;color:var(--fg-muted);margin-top:2px}.rank-row .deposit{font:600 13px var(--f-display);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rank-row .deposit-label{font-size:10px;color:var(--fg-muted);text-align:right;margin-top:2px}
+@media(min-width:700px){.app{max-width:760px}.podium{gap:16px}.podium-item{padding:17px}.podium-item .podium-name{font-size:14px}.podium-item .podium-value{font-size:13px}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, money, escapeHTML, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-app.innerHTML = `
-${topbarHTML('home')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Leaderboard</h1>
-    <p>Top earners this month. Payouts reset every 30 days.</p>
-  </div>
-
-  <div class="tabs" data-tabs="lb">
-    <button class="tab active" data-cat="all">All time</button>
-    <button class="tab" data-cat="month">This month</button>
-    <button class="tab" data-cat="week">This week</button>
-  </div>
-
-  <!-- podium top 3 -->
-  <div class="card card-pad-lg" style="background:linear-gradient(160deg,rgba(231,200,115,0.1),rgba(16,185,129,0.05));text-align:center;">
-    <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold-light);font-weight:600;">${I.trophy} Top 3 this month</div>
-    <div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;margin-top:18px;">
-      <div style="text-align:center;flex:1;">
-        <div class="avatar silver" style="width:52px;height:52px;font-size:18px;margin:0 auto;">${LCG.leaderboard[1].avatar}</div>
-        <div style="font-weight:600;font-size:13px;margin-top:8px;">${LCG.leaderboard[1].name.split(' ')[0]}</div>
-        <div class="small muted tnum">${nairaShort(LCG.leaderboard[1].amt)}</div>
-        <div style="font-family:var(--f-display);font-size:20px;font-weight:700;color:var(--fg-muted);margin-top:4px;">2</div>
-      </div>
-      <div style="text-align:center;flex:1.2;">
-        <div style="font-size:22px;margin-bottom:-4px;">👑</div>
-        <div class="avatar gold" style="width:64px;height:64px;font-size:22px;margin:0 auto;box-shadow:0 0 0 4px rgba(231,200,115,0.3),0 16px 30px -8px rgba(231,200,115,0.5);">${LCG.leaderboard[0].avatar}</div>
-        <div style="font-weight:700;font-size:14px;margin-top:8px;">${LCG.leaderboard[0].name.split(' ')[0]}</div>
-        <div class="small muted tnum">${nairaShort(LCG.leaderboard[0].amt)}</div>
-        <div style="font-family:var(--f-display);font-size:24px;font-weight:700;color:var(--gold-light);margin-top:4px;">1</div>
-      </div>
-      <div style="text-align:center;flex:1;">
-        <div class="avatar" style="width:52px;height:52px;font-size:18px;margin:0 auto;background:linear-gradient(135deg,#d8a571,#a16207);color:#1c1206;">${LCG.leaderboard[2].avatar}</div>
-        <div style="font-weight:600;font-size:13px;margin-top:8px;">${LCG.leaderboard[2].name.split(' ')[0]}</div>
-        <div class="small muted tnum">${nairaShort(LCG.leaderboard[2].amt)}</div>
-        <div style="font-family:var(--f-display);font-size:20px;font-weight:700;color:#d8a571;margin-top:4px;">3</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- your rank -->
-  <div class="card card-pad" style="border-color:rgba(52,211,153,0.3);background:rgba(16,185,129,0.06);">
-    <div class="flex between center">
-      <div class="flex gap-3 center">
-        <div class="lb-rank" style="background:rgba(16,185,129,0.18);color:var(--jade-light);">4</div>
-        <div>
-          <div style="font-weight:600;font-size:14px;">You · Adaeze O.</div>
-          <div class="small muted">VIP Gold · ${LCG.user.uid}</div>
-        </div>
-      </div>
-      <div class="end">
-        <div class="amt up">${naira(LCG.user.totalEarned)}</div>
-        <div class="ts">Your earnings</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- full ranking -->
-  <div class="section-head"><h2>Full ranking</h2></div>
-  <div style="display:flex;flex-direction:column;gap:8px;">
-    ${LCG.leaderboard.slice(3).map((m,i) => `
-      <div class="lb-row">
-        <div class="lb-rank ${i===0?'r3':''}">${i+4}</div>
-        <div class="flex center gap-3" style="min-width:0;">
-          <div class="avatar ${m.tone}" style="width:36px;height:36px;font-size:13px;">${m.avatar}</div>
-          <div style="min-width:0;">
-            <div style="font-weight:600;font-size:14px;">${m.name} ${m.me?'<span class="badge jade" style="font-size:9px;padding:2px 6px;">YOU</span>':''}</div>
-            <div class="small muted">${m.uid} · ${m.vip}</div>
-          </div>
-        </div>
-        <div class="end">
-          <div class="amt tnum">${naira(m.amt)}</div>
-        </div>
-      </div>
-    `).join('')}
-  </div>
-
-  <div class="card card-pad lux" style="background:linear-gradient(160deg,rgba(231,200,115,0.08),rgba(255,255,255,0.02));">
-    <div class="flex gap-3 center">
-      <div class="ic-box gold" style="width:42px;height:42px;">${I.fire}</div>
-      <div>
-        <div style="font-weight:600;font-size:14px;">Climb to rank #3</div>
-        <div class="small muted" style="margin-top:2px;">Earn ${naira(980000 - LCG.user.totalEarned)} more to overtake Tunde O.</div>
-      </div>
-    </div>
-  </div>
-</main>
-${bottomNavHTML('home')}
-`;
+const ui = window.LCGUI;
+app.dataset.liveReady = 'false';
+app.innerHTML = `${ui.topbarHTML('home', 0)}<main class="page page-enter" id="pageContent" aria-live="polite"></main>${ui.bottomNavHTML('home')}`;
+const content = document.getElementById('pageContent');
+const maskedName = (value) => {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Member';
+  const mask = part => `${part.slice(0, 1)}${'•'.repeat(Math.min(6, Math.max(3, part.length - 1)))}`;
+  if (parts.length === 1) return mask(parts[0]);
+  return `${mask(parts[0])} ${parts[parts.length - 1].slice(0, 1)}.`;
+};
+function setTopbarBalance(balance) {
+  document.querySelector('.topbar')?.remove();
+  app.insertAdjacentHTML('afterbegin', ui.topbarHTML('home', Number(balance) || 0));
+}
+function render(entries, userId) {
+  const rankings = entries.map(entry => ({
+    display: maskedName(entry.full_name),
+    initial: (String(entry.full_name || '').trim()[0] || 'M').toUpperCase(),
+    total: Number(entry.total_team_deposit) || 0,
+    isYou: Boolean(userId && entry.id === userId)
+  }));
+  const podium = rankings.length ? `<section class="card card-pad-lg" style="background:linear-gradient(160deg,rgba(231,200,115,.08),rgba(16,185,129,.035))"><div class="label" style="display:flex;align-items:center;gap:8px;color:var(--gold-light);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px">${ui.icons.trophy} Highest total team deposits</div><div class="podium">${rankings.slice(0,3).map((person,index)=>`<div class="podium-item ${index===0?'first':''}"><div class="avatar ${index===0?'gold':index===1?'silver':''}" style="width:${index===0?'54':'44'}px;height:${index===0?'54':'44'}px;font-size:${index===0?'19':'16'}px;margin:0 auto">${escapeHTML(person.initial)}</div><div class="podium-name" title="${escapeHTML(person.display)}">${escapeHTML(person.display)}${person.isYou?' <span class="badge jade" style="font-size:8px;padding:2px 5px">YOU</span>':''}</div><div class="podium-value">${escapeHTML(money(person.total,true))}</div><div style="font:700 ${index===0?'22':'18'}px var(--f-display);color:${index===0?'var(--gold-light)':index===1?'var(--fg-muted)':'#d8a571'};margin-top:5px">${index+1}</div></div>`).join('')}</div></section>` : '';
+  const rows = rankings.length ? `<div class="rank-list">${rankings.map((person,index)=>`<div class="rank-row ${person.isYou?'is-you':''}"><div class="rank-number">${index+1}</div><div class="who"><div class="avatar ${index===0?'gold':''}" style="width:38px;height:38px;font-size:14px">${escapeHTML(person.initial)}</div><div style="min-width:0"><div class="name">${escapeHTML(person.display)}${person.isYou?' <span class="badge jade" style="font-size:9px;padding:2px 6px">YOU</span>':''}</div><div class="rank-sub">${person.isYou?'Your position':'Ranked account'}</div></div></div><div><div class="deposit">${escapeHTML(money(person.total,true))}</div><div class="deposit-label">Team deposits</div></div></div>`).join('')}</div>` : showEmpty('Rankings will appear when eligible team-deposit data is available.');
+  content.innerHTML = `<header class="page-head"><h1>Leaderboard</h1><p>Ranked by total team deposits, highest first.</p></header>${podium}<section><div class="section-head" style="margin-bottom:10px"><h2>Top accounts</h2><span class="small muted">${rankings.length} shown</span></div>${rows}</section>`;
+  app.dataset.liveReady = 'true';
+}
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(content, 'Loading the live leaderboard…');
+  try {
+    const [leaderboardData, profileData, balanceData] = await Promise.all([
+      apiRequest('/api/leaderboard'),
+      apiRequest('/api/profile'),
+      apiRequest('/api/wallet?action=getBalance')
+    ]);
+    setTopbarBalance(balanceData.balance);
+    render(Array.isArray(leaderboardData?.leaderboard) ? leaderboardData.leaderboard : [], profileData?.user?.id);
+  } catch (error) {
+    showPageError(content, error, load);
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>

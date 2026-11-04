@@ -2,101 +2,116 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Withdraw</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.withdraw-page { max-width:680px; margin-inline:auto; }
+.withdraw-page .field + .field { margin-top:16px; }
+.withdraw-page .hero-balance { padding:22px; }
+.withdraw-summary { display:grid; gap:8px; margin-top:16px; }
+.withdraw-summary .summary-row { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding-top:8px; border-top:1px solid var(--border); }
+.withdraw-summary .summary-row span:last-child { text-align:right; overflow-wrap:anywhere; }
+@media(max-width:520px) {
+ .withdraw-page { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+ .withdraw-page .hero-balance { padding:20px 16px; }
+ .withdraw-page .hero-balance .amount { font-size:clamp(28px,8vw,36px); overflow-wrap:anywhere; }
+ .withdraw-page .btn-block { white-space:normal; line-height:1.25; padding-inline:14px; }
+}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false" aria-live="polite"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, money, escapeHTML, showPageError, showLoading } from '../assets/js/live-data.js';
+
 const app = document.getElementById('app');
-const tier = LCG.tiers.find(t=>t.current);
-const fee = tier.fee;
-const limit = tier.dailyLimit;
-app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Withdraw</h1>
-    <p>Funds arrive within 30 minutes during business hours.</p>
-  </div>
+const UI = window.LCGUI;
+const safeNumber = value => { const n = Number(value); return Number.isFinite(n) ? n : null; };
 
-  <div class="hero-balance" style="padding:20px;">
-    <div class="label">Available to withdraw</div>
-    <div class="amount" style="font-size:34px;"><span class="cur">₦</span>${LCG.user.available.toLocaleString()}</div>
-    <div class="sub-row">
-      <div class="sub"><div class="k">VIP fee</div><div class="v">${fee}%</div></div>
-      <div class="sub"><div class="k">Daily limit</div><div class="v">${nairaShort(limit)}</div></div>
-      <div class="sub"><div class="k">Earnings</div><div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div></div>
-    </div>
-  </div>
+function render(balance) {
+  app.innerHTML = `${UI.topbarHTML('me', balance)}<main class="page page-enter withdraw-page">
+    <div class="page-head"><h1>Withdraw</h1><p>Submit a payout request to the bank account entered below. No payout account is saved on this page.</p></div>
+    <section class="hero-balance" aria-label="Available balance"><div class="label">Available wallet balance</div><div class="amount">${escapeHTML(money(balance))}</div></section>
+    <div class="field" style="margin-top:18px"><label for="withdraw-amount">Withdrawal amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="withdraw-amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${escapeHTML(balance)}" placeholder="0.00" autocomplete="off" required></div><span class="small muted">Enter a positive amount up to your current available balance. Fees and limits are not estimated here.</span></div>
+    <div class="field"><label for="bank-name">Bank name</label><input class="input" id="bank-name" type="text" maxlength="120" autocomplete="organization" placeholder="Enter bank name" required></div>
+    <div class="field"><label for="account-number">Account number</label><input class="input" id="account-number" type="text" inputmode="numeric" maxlength="40" autocomplete="off" placeholder="Enter account number" required></div>
+    <div class="field"><label for="account-name">Account name</label><input class="input" id="account-name" type="text" maxlength="120" autocomplete="name" placeholder="Enter account holder name" required></div>
+    <div id="withdraw-result" aria-live="polite"></div>
+    <button class="btn btn-gold btn-block" id="submit-withdrawal" type="button">${UI.icons.withdraw} Submit withdrawal request</button>
+    <p class="small muted" style="text-align:center;line-height:1.6;margin-top:12px">Submitting a request deducts the requested amount immediately. Processing details and any fee or net amount are shown only when returned by the server.</p>
+  </main>${UI.bottomNavHTML('me')}`;
 
-  <div class="field">
-    <label for="amount">Withdrawal amount</label>
-    <div class="input-wrap">
-      <span class="lead" style="color:var(--jade-light);font-weight:600;left:16px;">₦</span>
-      <input class="input has-lead" id="amount" type="number" placeholder="0" min="1000" oninput="updatePreview()">
-      <button class="trail" onclick="document.getElementById('amount').value=${LCG.user.available};updatePreview();" style="background:rgba(52,211,153,0.1);color:var(--jade-light);">MAX</button>
-    </div>
-  </div>
-
-  <div class="amt-chips">
-    ${[1000,5000,10000,25000].map(c=>`<button class="amt-chip" onclick="document.getElementById('amount').value=${c};updatePreview();">₦${c/1000}K</button>`).join('')}
-  </div>
-
-  <div class="section-head"><h2>Payout account</h2><a href="#" class="link" onclick="toast('Add new account','info');return false;">+ Add</a></div>
-  <div style="display:flex;flex-direction:column;gap:10px;">
-    <div class="method on" onclick="this.parentElement.querySelectorAll('.method').forEach(m=>m.classList.remove('on'));this.classList.add('on');">
-      <div class="ic-box gold" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;">GT</div>
-      <div class="body"><div class="t">GTBank</div><div class="s">•••• 2841 · Adaeze O.</div></div>
-      <div class="check on"></div>
-    </div>
-    <div class="method" onclick="this.parentElement.querySelectorAll('.method').forEach(m=>m.classList.remove('on'));this.classList.add('on');">
-      <div class="ic-box jade" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;">AC</div>
-      <div class="body"><div class="t">Access Bank</div><div class="s">•••• 7190 · Adaeze O.</div></div>
-      <div class="check"></div>
-    </div>
-  </div>
-
-  <div class="card card-pad">
-    <div class="flex between center" style="padding:4px 0;">
-      <span class="small muted">Amount</span>
-      <span id="pvAmount" class="tnum" style="font-weight:600;">₦0.00</span>
-    </div>
-    <div class="flex between center" style="padding:10px 0;border-bottom:1px solid var(--border);">
-      <span class="small muted">Withdrawal fee (${fee}%)</span>
-      <span id="pvFee" class="tnum small">−₦0.00</span>
-    </div>
-    <div class="flex between center" style="padding-top:10px;">
-      <span style="font-weight:600;">You receive</span>
-      <span id="pvReceive" class="tnum" style="font-family:var(--f-display);font-weight:700;color:var(--jade-light);font-size:18px;">₦0.00</span>
-    </div>
-  </div>
-
-  <button class="btn btn-gold btn-block" onclick="confirmWithdraw()">${I.withdraw} Withdraw funds</button>
-  <p class="small muted" style="text-align:center;line-height:1.6;">Withdrawals process within 30 min (WAT 8am–10pm). Off-hours process next morning. VIP Gold tier receives priority.</p>
-</main>
-${bottomNavHTML('me')}
-`;
-
-function updatePreview(){
-  const amt = parseFloat(document.getElementById('amount').value)||0;
-  const f = amt * fee / 100;
-  document.getElementById('pvAmount').textContent = naira(amt);
-  document.getElementById('pvFee').textContent = '−' + naira(f);
-  document.getElementById('pvReceive').textContent = naira(amt - f);
+  const amountInput = document.getElementById('withdraw-amount');
+  const result = document.getElementById('withdraw-result');
+  const submit = document.getElementById('submit-withdrawal');
+  submit.addEventListener('click', async () => {
+    const amount = safeNumber(amountInput.value);
+    const bankName = document.getElementById('bank-name').value.trim();
+    const accountNumber = document.getElementById('account-number').value.trim();
+    const accountName = document.getElementById('account-name').value.trim();
+    if (amount === null || amount <= 0 || amount > balance || !bankName || !accountNumber || !accountName) {
+      UI.toast(amount !== null && amount > balance ? 'Amount exceeds your available balance.' : 'Enter a valid amount and complete all bank account details.','err');
+      return;
+    }
+    submit.disabled = true;
+    submit.textContent = 'Submitting request…';
+    result.innerHTML = '';
+    try {
+      const response = await apiRequest('/api/wallet?action=requestWithdrawal', {
+        method: 'POST',
+        body: { amount, bank_name: bankName, account_number: accountNumber, account_name: accountName }
+      });
+      const fee = safeNumber(response?.fee ?? response?.fee_amount);
+      const net = safeNumber(response?.net ?? response?.net_amount ?? response?.amount_received);
+      const requestId = response?.id ?? response?.request_id ?? response?.reference;
+      const returnedBalance = safeNumber(response?.balance);
+      let effectiveBalance = returnedBalance;
+      let balanceNote = '';
+      if (effectiveBalance === null) {
+        try {
+          const balanceResult = await apiRequest('/api/wallet?action=getBalance');
+          effectiveBalance = safeNumber(balanceResult?.balance);
+        } catch (_) { /* Request has succeeded; do not turn a balance refresh issue into a false submission error. */ }
+      }
+      if (effectiveBalance !== null) balanceNote = `<div class="summary-row"><span class="small muted">Updated available balance</span><span class="tnum">${escapeHTML(money(effectiveBalance))}</span></div>`;
+      const responseDetails = `${fee !== null ? `<div class="summary-row"><span class="small muted">Server-returned fee</span><span class="tnum">${escapeHTML(money(fee))}</span></div>` : ''}${net !== null ? `<div class="summary-row"><span class="small muted">Server-returned net amount</span><span class="tnum">${escapeHTML(money(net))}</span></div>` : ''}${requestId ? `<div class="summary-row"><span class="small muted">Request reference</span><span>${escapeHTML(requestId)}</span></div>` : ''}${balanceNote}`;
+      result.innerHTML = `<div class="card card-pad" style="margin-top:16px" role="status"><strong>Withdrawal request submitted</strong><p class="small muted" style="margin:6px 0 0">The requested amount has been deducted from your balance. Payout processing is subject to the server’s review.</p>${responseDetails ? `<div class="withdraw-summary">${responseDetails}</div>` : ''}</div>`;
+      UI.toast('Withdrawal request submitted.','ok');
+      if (effectiveBalance !== null) {
+        const amountNode = app.querySelector('.hero-balance .amount');
+        if (amountNode) amountNode.textContent = money(effectiveBalance);
+      }
+      amountInput.value = '';
+    } catch (error) {
+      result.innerHTML = `<div class="data-state data-state-error" role="alert"><p>${escapeHTML(error?.message || 'Could not submit the withdrawal request.')}</p></div>`;
+      UI.toast(error?.message || 'Could not submit withdrawal request.','err');
+    } finally {
+      submit.disabled = false;
+      submit.innerHTML = `${UI.icons.withdraw} Submit withdrawal request`;
+    }
+  });
+  app.dataset.liveReady = 'true';
 }
-function confirmWithdraw(){
-  const amt = parseFloat(document.getElementById('amount').value)||0;
-  if(amt < 1000){ toast('Minimum withdrawal is ₦1,000','err'); return; }
-  if(amt > LCG.user.available){ toast('Amount exceeds available balance','err'); return; }
-  if(amt > limit){ toast('Exceeds daily VIP limit of '+nairaShort(limit),'err'); return; }
-  toast('Withdrawal of '+naira(amt)+' submitted','info');
-  setTimeout(()=>toast('Funds arriving within 30 minutes','ok'), 1400);
+
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(app, 'Loading your account…');
+  try {
+    const response = await apiRequest('/api/wallet?action=getBalance');
+    const balance = safeNumber(response?.balance);
+    if (balance === null) throw new Error('The wallet service returned an invalid balance.');
+    render(balance);
+  } catch (error) {
+    showPageError(app, error, load);
+    app.dataset.liveReady = 'true';
+  }
 }
+
+load();
 </script>
 </body>
 </html>

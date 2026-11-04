@@ -2,209 +2,116 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Dashboard</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:16px;align-items:start}.dashboard-stack{display:flex;flex-direction:column;gap:16px}.dashboard-section{min-width:0}.dashboard-products{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}.dashboard-product{min-width:0}.dashboard-product .name{overflow-wrap:anywhere}.dashboard-intro{margin-bottom:18px}.dashboard-balance{margin:0}.live-list .row{gap:12px}.live-list .body{min-width:0}.live-list .t,.live-list .s{overflow-wrap:anywhere}.dashboard-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:760px){.dashboard-grid{grid-template-columns:1fr;gap:14px}.dashboard-section{width:100%}.dashboard-products{grid-template-columns:1fr}.dashboard-intro{margin-bottom:14px}}@media(max-width:380px){.live-list .row{align-items:flex-start}.dashboard-actions{grid-template-columns:1fr 1fr}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
-
+<div class="app" id="app" data-live-ready="false" aria-busy="true"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, getProfile, money, escapeHTML, formatDate, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-app.innerHTML = `
-${topbarHTML('home')}
-<main class="page page-enter">
+const ui = window.LCGUI;
 
-  <!-- greeting -->
-  <div class="flex between center">
-    <div>
-      <div class="small muted">Good evening,</div>
-      <div style="font-family:var(--f-display);font-size:20px;font-weight:600;">Adaeze 👋</div>
-    </div>
-    <div class="badge gold" style="background:rgba(231,200,115,0.14);">VIP · Gold</div>
-  </div>
+function transactionRows(transactions) {
+  if (!transactions.length) return showEmpty('Your wallet activity will appear here when you have transactions.');
+  return `<div class="list live-list">${transactions.slice(0,5).map((tx) => {
+    const type = escapeHTML(tx.type || tx.description || tx.transaction_type || 'Transaction');
+    const date = escapeHTML(formatDate(tx.created_at || tx.date || tx.updated_at));
+    const status = tx.status ? `<span class="badge muted">${escapeHTML(tx.status)}</span>` : '';
+    const rawAmount = Number(tx.amount || 0);
+    const flow = String(tx.type || tx.transaction_type || '').toLowerCase();
+    const incoming = /deposit|credit|received|earning|refund|return|commission|wheel_win|bonus|payout/.test(flow);
+    const outgoing = !incoming && /withdraw|debit|purchase|investment|payment/.test(flow);
+    const sign = incoming ? '+' : outgoing ? '−' : '';
+    const tone = incoming ? 'jade' : outgoing ? 'gold' : 'muted';
+    return `<div class="row"><div class="ic-box ${tone}">${incoming ? ui.icons.arrowDown : outgoing ? ui.icons.arrowUp : ui.icons.history}</div><div class="body"><div class="t">${type}</div><div class="s">${date} ${status}</div></div><div class="end"><div class="amt">${sign}${money(rawAmount)}</div></div></div>`;
+  }).join('')}</div>`;
+}
 
-  <!-- balance hero -->
-  <div class="hero-balance">
-    <div class="label"><span class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 8px var(--jade-light);"></span> Total balance</div>
-    <div class="amount"><span class="cur">₦</span>17,600<span style="font-size:18px;color:var(--fg-muted);font-family:var(--f-body);font-weight:500;">.00</span></div>
-    <div class="sub-row">
-      <div class="sub">
-        <div class="k">Available</div>
-        <div class="v">${naira(LCG.user.available)}</div>
+function productAvailable(product) {
+  const hasCapacity = product.category !== 'Limited' || !(Number(product.max_capacity) > 0) || Number(product.current_sold || 0) < Number(product.max_capacity);
+  return product.is_active === true && product.is_coming_soon !== true && hasCapacity;
+}
+
+function productCards(products) {
+  const featured = products.filter(productAvailable).slice(0,3);
+  if (!featured.length) return showEmpty('There are no currently available products to feature.');
+  return `<div class="dashboard-products">${featured.map((product) => `
+    <a href="products.html" class="card card-pad dashboard-product" style="display:block;text-decoration:none;">
+      <div class="flex between center" style="gap:10px"><div class="name" style="font-weight:650;font-size:16px;">${escapeHTML(product.name || 'Product')}</div>${ui.icons.chevron}</div>
+      <div class="small muted" style="margin-top:5px">${escapeHTML(product.category || 'Uncategorized')}</div>
+      <div class="grid-2" style="margin-top:14px">
+        <div><div class="small muted">Price</div><div style="font-weight:600">${money(product.price)}</div></div>
+        <div><div class="small muted">Profit amount</div><div style="font-weight:600;color:var(--jade-light)">${money(product.profit)}</div></div>
       </div>
-      <div class="sub">
-        <div class="k">Earnings</div>
-        <div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div>
-      </div>
-      <div class="sub">
-        <div class="k">Invested</div>
-        <div class="v">${nairaShort(LCG.user.invested)}</div>
-      </div>
-    </div>
-  </div>
+      <div class="small muted" style="margin-top:12px">${escapeHTML(product.duration_days ?? '—')} days · ${escapeHTML(product.payout_type || 'Payout details unavailable')}</div>
+    </a>`).join('')}</div>`;
+}
 
-  <!-- primary actions -->
-  <div class="grid-2">
-    <a href="deposit.html" class="btn btn-jade" style="flex:1;">${I.deposit} Deposit</a>
-    <a href="withdraw.html" class="btn btn-ghost" style="flex:1;">${I.withdraw} Withdraw</a>
-  </div>
-
-  <!-- banner carousel -->
-  <div class="banner" data-carousel>
-    <div class="slide on" style="background:linear-gradient(135deg,#0a3a2a,#02160f);">
-      <div class="eyebrow">Limited series</div>
-      <div class="ttl">Obsidian — 3.8% daily</div>
-      <div class="desc">Only 500 slots. Premium allocation now open.</div>
-    </div>
-    <div class="slide" style="background:linear-gradient(135deg,#3a2a0a,#1f1503);">
-      <div class="eyebrow" style="color:var(--gold-light);">Invite & earn</div>
-      <div class="ttl">10% referral bonus</div>
-      <div class="desc">Plus 3% on second-level team earnings.</div>
-    </div>
-    <div class="slide" style="background:linear-gradient(135deg,#2a0a3a,#150321);">
-      <div class="eyebrow" style="color:var(--violet);">Daily reward</div>
-      <div class="ttl">Lucky wheel spin</div>
-      <div class="desc">Win up to ₦1,000 every day. Free spin.</div>
-    </div>
-    <div class="dots"><i class="on"></i><i></i><i></i></div>
-  </div>
-
-  <!-- quick actions -->
-  <div class="card card-pad">
-    <div class="quick-grid">
-      <a href="#" class="quick-item" onclick="doCheckin();return false;">
-        <span class="ic gold">${I.sign}</span>
-        <span class="lbl">Check in</span>
-      </a>
-      <a href="team.html" class="quick-item">
-        <span class="ic">${I.team}</span>
-        <span class="lbl">My team</span>
-      </a>
-      <a href="wheel.html" class="quick-item">
-        <span class="ic violet">${I.wheel}</span>
-        <span class="lbl">Spin</span>
-      </a>
-      <a href="leaderboard.html" class="quick-item">
-        <span class="ic gold">${I.trophy}</span>
-        <span class="lbl">Ranks</span>
-      </a>
-      <a href="special-vip.html" class="quick-item">
-        <span class="ic gold">${I.vip}</span>
-        <span class="lbl">VIP</span>
-      </a>
-      <a href="#" class="quick-item" onclick="toast('Share your code: ADAEZE-LCG','ok');copyText('ADAEZE-LCG','Referral code');return false;">
-        <span class="ic">${I.invite}</span>
-        <span class="lbl">Invite</span>
-      </a>
-      <a href="support.html" class="quick-item">
-        <span class="ic">${I.service}</span>
-        <span class="lbl">Support</span>
-      </a>
-      <a href="#" class="quick-item" onclick="toast('App download coming soon','info');return false;">
-        <span class="ic">${I.download}</span>
-        <span class="lbl">App</span>
-      </a>
-    </div>
-  </div>
-
-  <!-- live rates ticker (market data, not fake user activity) -->
-  <div class="ticker">
-    <div class="live"><span class="dot"></span>LIVE</div>
-    <div class="track"><div class="scroll">
-      ${LCG.rates.map(r => `<span>${r.k} <b class="${r.up?'':'down'}">${r.v}</b> ${r.d}</span>`).join('')}
-      ${LCG.rates.map(r => `<span>${r.k} <b class="${r.up?'':'down'}">${r.v}</b> ${r.d}</span>`).join('')}
-    </div></div>
-  </div>
-
-  <!-- stat row -->
-  <div class="stat-row">
-    <div class="stat lux">
-      <div class="k">${I.coin} Total earned</div>
-      <div class="v text-jade-grad">${naira(LCG.user.totalEarned)}</div>
-      <div class="delta up">▲ +12.4% this week</div>
-    </div>
-    <div class="stat lux">
-      <div class="k">${I.bolt} Active plans</div>
-      <div class="v">3</div>
-      <div class="delta up">▲ +1 new this week</div>
-    </div>
-  </div>
-
-  <!-- portfolio mini chart -->
-  <div class="card chart-card lux">
-    <div class="flex between center">
-      <div>
-        <div class="small muted">Portfolio growth · 7d</div>
-        <div style="font-family:var(--f-display);font-size:20px;font-weight:700;margin-top:2px;">${naira(LCG.user.totalEarned)}</div>
-      </div>
-      <span class="badge jade">▲ +12.4%</span>
-    </div>
-    <svg class="spark" style="margin-top:14px;" viewBox="0 0 320 56" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="sp" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#34d399" stop-opacity="0.4"/>
-          <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <path d="M0 40 L40 38 L80 32 L120 34 L160 24 L200 20 L240 22 L280 12 L320 8" fill="none" stroke="#34d399" stroke-width="2"/>
-      <path d="M0 40 L40 38 L80 32 L120 34 L160 24 L200 20 L240 22 L280 12 L320 8 L320 56 L0 56 Z" fill="url(#sp)"/>
-    </svg>
-  </div>
-
-  <!-- featured plan -->
-  <div class="section-head"><h2>Featured plans</h2><a href="products.html" class="link">View all →</a></div>
-  <div class="scroll-x" style="display:flex;gap:12px;padding:4px;margin:-4px -4px 0;">
-    ${LCG.plans.filter(p=>!p.sold).slice(0,3).map(p => `
-      <a href="products.html" class="plan ${p.accent} lux" style="min-width:240px;flex-shrink:0;">
-        <div class="top">
-          <div><div class="name">${p.name}</div><div class="cat">${p.cat}</div></div>
-          ${p.badge?`<span class="tag ${p.accent}">${p.badge}</span>`:''}
+function render({profileData, balanceData, investmentData, historyData, productData}) {
+  const balance = Number(balanceData?.balance || 0);
+  const investments = Array.isArray(investmentData?.investments) ? investmentData.investments : [];
+  const transactions = Array.isArray(historyData?.transactions) ? historyData.transactions : [];
+  const products = Array.isArray(productData?.products) ? productData.products : [];
+  const activeInvestments = investments.filter((item) => String(item.status || '').toLowerCase() === 'active');
+  const investedAmount = activeInvestments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const user = profileData?.profile || profileData?.user || {};
+  const fullName = user.full_name || user.name || user.display_name || '';
+  const firstName = String(fullName).trim().split(/\s+/)[0];
+  const greeting = firstName ? `Welcome back, ${escapeHTML(firstName)}` : 'Welcome back';
+  app.innerHTML = `
+    ${ui.topbarHTML('home', balance)}
+    <main class="page page-enter">
+      <div class="flex between center dashboard-intro" style="gap:12px;flex-wrap:wrap"><div><div class="small muted">Your account overview</div><h1 style="font-family:var(--f-display);font-size:clamp(22px,4vw,30px);margin:4px 0 0">${greeting}</h1></div><div class="badge jade">Live account</div></div>
+      <section class="hero-balance dashboard-balance" aria-label="Wallet balance">
+        <div class="label"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 8px var(--jade-light)"></span> Current balance</div>
+        <div class="amount">${money(balance)}</div>
+        <div class="sub-row"><div class="sub"><div class="k">Active investments</div><div class="v">${activeInvestments.length}</div></div><div class="sub"><div class="k">Amount invested</div><div class="v">${money(investedAmount, true)}</div></div><div class="sub"><div class="k">Products available</div><div class="v">${products.filter(productAvailable).length}</div></div></div>
+      </section>
+      <div class="dashboard-actions" style="margin:14px 0 20px"><a href="deposit.html" class="btn btn-jade">${ui.icons.deposit} Deposit</a><a href="withdraw.html" class="btn btn-ghost">${ui.icons.withdraw} Withdraw</a></div>
+      <div class="dashboard-grid">
+        <div class="dashboard-stack">
+          <section class="dashboard-section"><div class="section-head"><h2>Active investments</h2><a href="investments.html" class="link">View all →</a></div>
+            ${activeInvestments.length ? `<div style="display:flex;flex-direction:column;gap:10px">${activeInvestments.slice(0,4).map((item)=>`<a href="investments.html" class="card card-pad" style="display:flex;justify-content:space-between;align-items:center;gap:12px;text-decoration:none"><span style="min-width:0"><span style="display:block;font-weight:600;overflow-wrap:anywhere">${escapeHTML(item.products?.name || 'Investment')}</span><span class="small muted">${money(item.amount)} · ${escapeHTML(item.status || '')}</span></span><span class="small muted" style="text-align:right;white-space:nowrap">${escapeHTML(formatDate(item.end_date))}<br>End date</span></a>`).join('')}</div>` : showEmpty('You have no active investments yet.')}
+          </section>
+          <section class="dashboard-section"><div class="section-head"><h2>Recent transactions</h2><a href="wallet.html" class="link">Wallet →</a></div><div class="card card-pad">${transactionRows(transactions)}</div></section>
         </div>
-        <div class="stats">
-          <div class="s"><div class="k">Daily</div><div class="v ${p.accent}">${p.daily}%</div></div>
-          <div class="s"><div class="k">Cycle</div><div class="v">${p.days}d</div></div>
-          <div class="s"><div class="k">Return</div><div class="v ${p.accent}">${p.total}%</div></div>
-        </div>
-        <div class="cta"><span class="btn btn-ghost btn-sm btn-block">From ${nairaShort(p.min)}</span></div>
-      </a>
-    `).join('')}
-  </div>
+        <section class="dashboard-section"><div class="section-head"><h2>Featured products</h2><a href="products.html" class="link">View catalog →</a></div>${productCards(products)}</section>
+      </div>
+      <div class="foot-mini"><div class="logo-row">${ui.icons.shield}${ui.icons.lock}</div>LCG · Account information from your live account</div>
+    </main>
+    ${ui.bottomNavHTML('home')}`;
+  app.setAttribute('aria-busy', 'false');
+}
 
-  <!-- recent activity -->
-  <div class="section-head"><h2>Recent activity</h2><a href="wallet.html" class="link">View all →</a></div>
-  <div class="card card-pad">
-    <div class="list">
-      ${LCG.transactions.slice(0,5).map(t => `
-        <div class="row">
-          <div class="ic-box ${t.tone}">${I[t.ic]||I.coin}</div>
-          <div class="body">
-            <div class="t">${t.type}</div>
-            <div class="s">${t.sub}</div>
-          </div>
-          <div class="end">
-            <div class="amt ${t.dir==='in'?'up':'down'}">${t.dir==='in'?'+':'−'}${naira(t.amt)}</div>
-            <div class="ts">${t.ts}</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  </div>
-
-  <div class="foot-mini">
-    <div class="logo-row">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/></svg>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-    </div>
-    LCG Wealth Platform · Capital protected · Licensed<br>
-    Version 2.4.0 · © 2026 LCG
-  </div>
-</main>
-${bottomNavHTML('home')}
-`;
+async function load() {
+  app.dataset.liveReady = 'false';
+  app.setAttribute('aria-busy', 'true');
+  showLoading(app, 'Loading your live account…');
+  try {
+    const [profileData, balanceData, investmentData, historyData, productData] = await Promise.all([
+      getProfile(),
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/investments?action=getInvestments'),
+      apiRequest('/api/wallet?action=getHistory'),
+      apiRequest('/api/products?action=getProducts')
+    ]);
+    render({profileData, balanceData, investmentData, historyData, productData});
+    app.dataset.liveReady = 'true';
+  } catch (error) {
+    showPageError(app, error, load);
+    app.setAttribute('aria-busy', 'false');
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>

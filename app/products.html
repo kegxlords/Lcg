@@ -2,75 +2,140 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Investment Products</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr));gap:14px}.live-product{min-width:0;display:flex;flex-direction:column}.live-product .name{font-family:var(--f-display);font-size:19px;font-weight:650;overflow-wrap:anywhere}.live-product .product-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.live-product .field{min-width:0;padding:11px;border-radius:12px;background:rgba(255,255,255,.035)}.live-product .field .value{font-weight:650;overflow-wrap:anywhere}.live-product .product-footer{margin-top:auto;padding-top:16px;display:flex;justify-content:space-between;align-items:center;gap:12px}.product-filter-tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.product-filter-tabs .tab{white-space:nowrap}@media(max-width:600px){.product-grid{grid-template-columns:1fr}.live-product.card-pad{padding:17px}.live-product .product-footer{align-items:stretch;flex-direction:column}.live-product .product-footer .btn{width:100%}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false" aria-busy="true"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, getProfile, money, escapeHTML, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const cats = [
-  { key: 'all', label: 'All' },
-  { key: 'general', label: 'General' },
-  { key: 'welfare', label: 'Welfare' },
-  { key: 'limited', label: 'Limited' },
-];
-app.innerHTML = `
-${topbarHTML('plans')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Investment products</h1>
-    <p>Curated plans across general, welfare, and limited series.</p>
-  </div>
+const ui = window.LCGUI;
+let products = [];
+let activeFilter = '__all__';
+let currentBalance = 0;
 
-  <div class="tabs" data-tabs="plans">
-    ${cats.map((c,i)=>`<button class="tab ${i===0?'active':''}" data-cat="${c.key}">${c.label}</button>`).join('')}
-  </div>
-
-  <div data-tab-panel="plans" style="display:flex;flex-direction:column;gap:14px;">
-    ${LCG.plans.map(p => `
-      <div class="plan ${p.accent} ${p.sold?'sold':''} lux" data-cat="${p.cat}">
-        <div class="top">
-          <div>
-            <div class="name">${p.name}</div>
-            <div class="cat">${p.cat} · ${p.days}-day cycle</div>
-          </div>
-          ${p.badge?`<span class="tag ${p.accent}">${p.badge}</span>`:`${p.sold?'<span class="tag muted">Sold out</span>':''}`}
-        </div>
-        <div class="stats">
-          <div class="s"><div class="k">Daily rate</div><div class="v ${p.accent}">${p.daily}%</div></div>
-          <div class="s"><div class="k">Duration</div><div class="v">${p.days}d</div></div>
-          <div class="s"><div class="k">Total return</div><div class="v ${p.accent}">${p.total}%</div></div>
-        </div>
-        <div class="perks">
-          ${p.perks.map(pk=>`<li${p.sold?' class="off"':''}>${pk}</li>`).join('')}
-        </div>
-        <div class="flex between center" style="margin-top:14px;">
-          <div class="small muted">${naira(p.min)} – ${nairaShort(p.max)}</div>
-          ${p.sold
-            ? `<button class="btn btn-ghost btn-sm" onclick="toast('Added to waitlist','info');">Join waitlist</button>`
-            : `<button class="btn btn-jade btn-sm" onclick="toast('Opening ${p.name}…','ok');setTimeout(()=>location.href='investments.html',500);">Invest now</button>`}
-        </div>
+function isAvailable(product) {
+  const hasCapacity = product.category !== 'Limited' || !(Number(product.max_capacity) > 0) || Number(product.current_sold || 0) < Number(product.max_capacity);
+  return product.is_active === true && product.is_coming_soon !== true && hasCapacity;
+}
+function categoriesFor(items) {
+  const seen = new Map();
+  items.forEach((item)=>{
+    const raw = String(item.category || 'Uncategorized');
+    if (!seen.has(raw)) seen.set(raw,raw);
+  });
+  return [...seen.values()];
+}
+function renderProductCards() {
+  const panel = app.querySelector('[data-product-panel]');
+  const categories = categoriesFor(products);
+  const visibleProducts = products.filter((item)=>activeFilter === '__all__' || String(item.category || 'Uncategorized') === activeFilter);
+  panel.innerHTML = visibleProducts.length ? `<div class="product-grid">${visibleProducts.map((product)=>{
+    const available = isAvailable(product);
+    const soldOut = product.category === 'Limited' && product.is_active === true && product.is_coming_soon !== true && Number(product.max_capacity) > 0 && Number(product.current_sold || 0) >= Number(product.max_capacity);
+    const stateLabel = product.is_coming_soon === true ? 'Coming soon' : soldOut ? 'Sold out' : available ? 'Available' : 'Unavailable';
+    const stateClass = available ? 'jade' : product.is_coming_soon === true ? 'gold' : 'muted';
+    const remaining = Number(product.max_capacity) > 0 ? `${escapeHTML(product.current_sold ?? 0)} / ${escapeHTML(product.max_capacity)} sold` : 'Capacity not listed';
+    return `<article class="card card-pad live-product lux">
+      <div class="flex between center" style="gap:10px"><div class="name">${escapeHTML(product.name || 'Product')}</div><span class="badge ${stateClass}">${stateLabel}</span></div>
+      <div class="small muted" style="margin-top:6px">${escapeHTML(product.category || 'Uncategorized')}</div>
+      <div class="product-fields">
+        <div class="field"><div class="k">Price</div><div class="value">${money(product.price)}</div></div>
+        <div class="field"><div class="k">Profit amount</div><div class="value" style="color:var(--jade-light)">${money(product.profit)}</div></div>
+        <div class="field"><div class="k">Duration</div><div class="value">${escapeHTML(product.duration_days ?? '—')} days</div></div>
+        <div class="field"><div class="k">Payout type</div><div class="value">${escapeHTML(product.payout_type || '—')}</div></div>
       </div>
-    `).join('')}
-  </div>
-
-  <div class="card card-pad" style="background:rgba(231,200,115,0.05);border-color:rgba(231,200,115,0.18);">
-    <div class="flex gap-3 center">
-      <div class="ic-box gold" style="width:42px;height:42px;border-radius:12px;display:grid;place-items:center;">${I.shield}</div>
-      <div>
-        <div style="font-weight:600;font-size:14px;">Capital protection</div>
-        <div class="small muted" style="margin-top:2px;">Plans above ₦200,000 are covered by the LCG Investor Protection Fund.</div>
-      </div>
-    </div>
-  </div>
-</main>
-${bottomNavHTML('plans')}
-`;
+      <div class="small muted" style="margin-top:11px">${remaining}</div>
+      ${available ? `<div class="product-footer"><span class="small muted">Purchase price<br><strong style="color:var(--fg)">${money(product.price)}</strong></span><button class="btn btn-jade btn-sm" type="button" data-buy-product="${escapeHTML(product.id)}">${ui.icons.plus} Buy product</button></div>` : ''}
+    </article>`;
+  }).join('')}</div>` : showEmpty(activeFilter === '__all__' ? 'No products are listed in the catalog yet.' : 'No products are listed in this category.');
+  app.querySelectorAll('[data-buy-product]').forEach((button)=>button.addEventListener('click',()=>purchase(button.dataset.buyProduct,button)));
+}
+function renderShell(balance) {
+  const categories = categoriesFor(products);
+  currentBalance = balance;
+  app.innerHTML = `
+    ${ui.topbarHTML('plans',balance)}
+    <main class="page page-enter">
+      <div class="page-head"><h1>Investment products</h1><p>Browse catalog details and current availability.</p></div>
+      <div class="tabs product-filter-tabs" role="tablist" aria-label="Filter products"><button class="tab ${activeFilter === '__all__' ? 'active' : ''}" data-filter="__all__" type="button">All products</button>${categories.map((category)=>`<button class="tab ${activeFilter === category ? 'active' : ''}" data-filter="${escapeHTML(category)}" type="button">${escapeHTML(category)}</button>`).join('')}</div>
+      <div data-product-error aria-live="polite"></div>
+      <div data-product-panel></div>
+      <div class="small muted" style="margin-top:18px">Profit is shown as an amount from the product record. Product availability is subject to current catalog status and capacity.</div>
+    </main>
+    ${ui.bottomNavHTML('plans')}`;
+  renderProductCards();
+  app.querySelectorAll('[data-filter]').forEach((button)=>button.addEventListener('click',()=>{
+    activeFilter = button.dataset.filter;
+    app.querySelectorAll('[data-filter]').forEach((tab)=>tab.classList.toggle('active',tab===button));
+    renderProductCards();
+  }));
+  app.setAttribute('aria-busy','false');
+}
+async function purchase(productId, button) {
+  const product = products.find((item)=>String(item.id) === String(productId));
+  if (!product || !isAvailable(product)) return;
+  const title = String(product.name || 'Product');
+  const amount = money(product.price);
+  if (!window.confirm(`Confirm purchase of “${title}” for ${amount}?`)) return;
+  button.disabled = true;
+  button.textContent = 'Processing…';
+  try {
+    const purchaseResult = await apiRequest('/api/products?action=buyProduct',{method:'POST',body:{product_id:product.id}});
+    if (purchaseResult?.success === false) throw new Error(purchaseResult.error || 'The purchase was not completed.');
+  } catch (error) {
+    const notice = app.querySelector('[data-product-error]');
+    if (notice) showPageError(notice,error,load);
+    button.disabled = false;
+    button.innerHTML = `${ui.icons.plus} Buy product`;
+    return;
+  }
+  ui.toast('Purchase completed.','ok');
+  button.disabled = true;
+  button.textContent = 'Purchased';
+  try {
+    const [result, balanceData] = await Promise.all([
+      apiRequest('/api/products?action=getProducts'),
+      apiRequest('/api/wallet?action=getBalance')
+    ]);
+    products = Array.isArray(result?.products) ? result.products : [];
+    currentBalance = Number(balanceData?.balance || 0);
+    activeFilter = '__all__';
+    renderShell(currentBalance);
+  } catch (_) {
+    const notice = app.querySelector('[data-product-error]');
+    if (notice) showPageError(notice,new Error('Purchase completed successfully, but account data could not be refreshed. Retry to sync your account.'),load);
+  }
+}
+async function load() {
+  app.dataset.liveReady = 'false';
+  app.setAttribute('aria-busy','true');
+  showLoading(app,'Loading the live product catalog…');
+  try {
+    const [profileData,balanceData,productData] = await Promise.all([
+      getProfile(),
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/products?action=getProducts')
+    ]);
+    void profileData;
+    products = Array.isArray(productData?.products) ? productData.products : [];
+    renderShell(Number(balanceData?.balance || 0));
+    app.dataset.liveReady = 'true';
+  } catch (error) {
+    showPageError(app,error,load);
+    app.setAttribute('aria-busy','false');
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>

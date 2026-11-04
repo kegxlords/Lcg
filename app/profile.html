@@ -2,155 +2,77 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Profile</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.profile-hero{text-align:center;padding:23px 18px;background:radial-gradient(90% 100% at 50% 0,rgba(16,185,129,.12),transparent 65%),linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.02))}.profile-hero .avatar{width:66px;height:66px;font-size:25px;margin:0 auto 12px}.profile-name{font:700 clamp(21px,5vw,28px)/1.2 var(--f-display);overflow-wrap:anywhere}.profile-contact{font-size:13px;color:var(--fg-muted);overflow-wrap:anywhere;margin-top:5px}.profile-tier{display:inline-flex;align-items:center;gap:6px;margin-top:12px}.profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.profile-stat{min-width:0;padding:15px;border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.03)}.profile-stat .k{font-size:11px;color:var(--fg-muted)}.profile-stat .v{font:700 clamp(16px,4.5vw,22px)/1.25 var(--f-display);margin-top:5px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.account-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}.account-row:last-child{border-bottom:0;padding-bottom:0}.account-row:first-child{padding-top:0}.account-row .body{min-width:0;flex:1}.account-row .title{font-size:13px;color:var(--fg-muted)}.account-row .value{font-size:14px;font-weight:500;overflow-wrap:anywhere;margin-top:2px}.signout{color:#fb7185}
+@media(min-width:700px){.app{max-width:760px}.profile-stats{gap:14px}.profile-stat{padding:19px}.profile-stat .v{font-size:24px}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, getProfile, money, escapeHTML, formatDate, showPageError, showLoading, signOut } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const u = LCG.user;
-app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="profile-head">
-    <div class="avatar gold">${u.avatar}</div>
-    <div class="name">${u.name}</div>
-    <div class="uid">${u.uid} · ${I.copy}</div>
-    <div class="vip-pill">
-      <span class="badge gold">${I.vip} ${u.vip.name} · Level ${u.vip.level}</span>
-    </div>
-    <div class="small muted" style="margin-top:6px;">Member since ${u.joined}</div>
-  </div>
-
-  <!-- lifetime stats -->
-  <div class="card card-pad">
-    <div style="font-weight:600;font-size:13px;color:var(--fg-muted);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:12px;">Lifetime</div>
-    <div class="grid-2">
-      <div>
-        <div class="small muted">Total earned</div>
-        <div style="font-family:var(--f-display);font-size:18px;font-weight:700;color:var(--jade-light);margin-top:2px;">${naira(u.totalEarned)}</div>
-      </div>
-      <div>
-        <div class="small muted">Total invested</div>
-        <div style="font-family:var(--f-display);font-size:18px;font-weight:700;margin-top:2px;">${nairaShort(u.invested)}</div>
-      </div>
-      <div>
-        <div class="small muted">Team size</div>
-        <div style="font-family:var(--f-display);font-size:18px;font-weight:700;margin-top:2px;">${u.teamSize}</div>
-      </div>
-      <div>
-        <div class="small muted">Check-in streak</div>
-        <div style="font-family:var(--f-display);font-size:18px;font-weight:700;margin-top:2px;color:var(--gold-light);">${u.checkinStreak} days 🔥</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- referral mini -->
-  <div class="card card-pad lux" style="background:linear-gradient(160deg,rgba(231,200,115,0.08),rgba(255,255,255,0.02));">
-    <div class="flex between center">
-      <div>
-        <div class="small muted">Your referral code</div>
-        <div style="font-family:var(--f-display);font-size:18px;font-weight:700;margin-top:2px;">${u.referralCode}</div>
-      </div>
-      <button class="btn btn-ghost btn-sm" onclick="copyText('${u.referralCode}','Code')">${I.share} Share</button>
-    </div>
-  </div>
-
-  <!-- account section -->
-  <div class="section-head"><h2>Account</h2></div>
-  <div class="card" style="overflow:hidden;">
-    <a href="#" class="set-row" onclick="toast('Edit profile','info');return false;">
-      <div class="ic-box">${I.user}</div>
-      <div class="body">Personal info<div class="s">${u.email}</div></div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Phone settings','info');return false;">
-      <div class="ic-box">${I.phone}</div>
-      <div class="body">Phone number<div class="s">${u.phone}</div></div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Bank accounts','info');return false;">
-      <div class="ic-box">${I.bank}</div>
-      <div class="body">Bank accounts<div class="s">2 linked</div></div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('KYC verified','ok');return false;">
-      <div class="ic-box jade">${I.shield}</div>
-      <div class="body">Identity verification<div class="s" style="color:var(--jade-light);">✓ Verified</div></div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-  </div>
-
-  <!-- preferences -->
-  <div class="section-head"><h2>Preferences</h2></div>
-  <div class="card" style="overflow:hidden;">
-    <a href="#" class="set-row" onclick="toggleNotif(this);return false;">
-      <div class="ic-box">${I.bell}</div>
-      <div class="body">Notifications</div>
-      <div class="chev" style="display:flex;align-items:center;gap:8px;"><span class="small muted">On</span>${I.chevron}</div>
-    </a>
-    <a href="special-vip.html" class="set-row">
-      <div class="ic-box gold">${I.vip}</div>
-      <div class="body">VIP program</div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Language: English','info');return false;">
-      <div class="ic-box">${I.info}</div>
-      <div class="body">Language</div>
-      <div class="chev" style="display:flex;align-items:center;gap:8px;"><span class="small muted">English</span>${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Appearance: Dark','info');return false;">
-      <div class="ic-box">${I.moon}</div>
-      <div class="body">Appearance</div>
-      <div class="chev" style="display:flex;align-items:center;gap:8px;"><span class="small muted">Dark</span>${I.chevron}</div>
-    </a>
-  </div>
-
-  <!-- about -->
-  <div class="section-head"><h2>About</h2></div>
-  <div class="card" style="overflow:hidden;">
-    <a href="support.html" class="set-row">
-      <div class="ic-box">${I.help}</div>
-      <div class="body">Help & support</div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Terms of Service','info');return false;">
-      <div class="ic-box">${I.info}</div>
-      <div class="body">Terms of service</div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <a href="#" class="set-row" onclick="toast('Privacy policy','info');return false;">
-      <div class="ic-box">${I.shield}</div>
-      <div class="body">Privacy policy</div>
-      <div class="chev">${I.chevron}</div>
-    </a>
-    <div class="set-row">
-      <div class="ic-box">${I.info}</div>
-      <div class="body">App version</div>
-      <div class="chev"><span class="small muted">2.4.0</span></div>
-    </div>
-  </div>
-
-  <a href="../index.html" class="btn btn-ghost btn-block" style="color:#fb7185;">${I.logout} Sign out</a>
-
-  <div class="foot-mini">
-    © 2026 LCG Wealth Platform · Licensed<br>
-    All investments carry risk. Only invest what you can afford to lose.
-  </div>
-</main>
-${bottomNavHTML('me')}
-`;
-
-function toggleNotif(el){
-  const s = el.querySelector('.small.muted');
-  if(s.textContent==='On'){ s.textContent='Off'; s.style.color='var(--fg-muted)'; toast('Notifications off','info'); }
-  else { s.textContent='On'; s.style.color=''; toast('Notifications on','ok'); }
+const ui = window.LCGUI;
+app.dataset.liveReady = 'false';
+app.innerHTML = `${ui.topbarHTML('me', 0)}<main class="page page-enter" id="pageContent" aria-live="polite"></main>${ui.bottomNavHTML('me')}`;
+const content = document.getElementById('pageContent');
+const amount = (value) => money(Number(value) || 0);
+function setTopbarBalance(balance) {
+  document.querySelector('.topbar')?.remove();
+  app.insertAdjacentHTML('afterbegin', ui.topbarHTML('me', Number(balance) || 0));
 }
+function render(data, balanceData, investmentData) {
+  const user = data?.user || {};
+  const profile = data?.profile || {};
+  const investments = Array.isArray(investmentData?.investments) ? investmentData.investments : [];
+  const name = String(profile.full_name || 'Account holder');
+  const email = String(user.email || profile.email || '');
+  const phone = String(profile.phone || '');
+  const code = String(profile.referral_code || '');
+  const tier = String(profile.tier || '');
+  const invested = investments.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const totalDeposits = Number(profile.total_personal_deposit) || 0;
+  const joined = formatDate(profile.created_at);
+  content.innerHTML = `
+    <header class="page-head"><h1>Profile</h1><p>Your account details and live activity.</p></header>
+    <section class="card profile-hero"><div class="avatar gold" aria-hidden="true">${escapeHTML(name.trim().charAt(0).toUpperCase() || 'A')}</div><h2 class="profile-name">${escapeHTML(name)}</h2>${email?`<div class="profile-contact">${escapeHTML(email)}</div>`:''}${tier?`<div class="profile-tier"><span class="badge gold">${ui.icons.vip} ${escapeHTML(tier)}</span></div>`:''}<div class="small muted" style="margin-top:9px">Member since ${escapeHTML(joined)}</div></section>
+    <section class="profile-stats" aria-label="Account activity"><div class="profile-stat"><div class="k">Wallet balance</div><div class="v" style="color:var(--jade-light)">${amount(balanceData?.balance)}</div></div><div class="profile-stat"><div class="k">Total personal deposits</div><div class="v">${amount(totalDeposits)}</div></div><div class="profile-stat"><div class="k">Investment capital</div><div class="v">${amount(invested)}</div></div><div class="profile-stat"><div class="k">Investments</div><div class="v">${investments.length.toLocaleString('en-NG')}</div></div></section>
+    <section class="card card-pad"><div class="section-head" style="padding:0 0 14px"><h2>Account details</h2></div><div class="account-row"><div class="ic-box">${ui.icons.mail}</div><div class="body"><div class="title">Email</div><div class="value">${email?escapeHTML(email):'Not provided'}</div></div></div><div class="account-row"><div class="ic-box">${ui.icons.phone}</div><div class="body"><div class="title">Phone number</div><div class="value">${phone?escapeHTML(phone):'Not provided'}</div></div></div>${code?`<div class="account-row"><div class="ic-box gold">${ui.icons.gift}</div><div class="body"><div class="title">Your referral code</div><div class="value" style="font-family:var(--f-display);font-weight:600;letter-spacing:.03em">${escapeHTML(code)}</div></div><button class="btn btn-ghost btn-sm" type="button" data-copy-code aria-label="Copy referral code">${ui.icons.copy}</button></div>`:''}</section>
+    <section class="card card-pad"><div class="section-head" style="padding:0 0 12px"><h2>More</h2></div><a href="special-vip.html" class="set-row"><div class="ic-box gold">${ui.icons.vip}</div><div class="body">VIP program<div class="s">View membership benefits</div></div><div class="chev">${ui.icons.chevron}</div></a><a href="support.html" class="set-row"><div class="ic-box">${ui.icons.help}</div><div class="body">Help &amp; support</div><div class="chev">${ui.icons.chevron}</div></a></section>
+    <button class="btn btn-ghost btn-block signout" type="button" data-sign-out>${ui.icons.logout} Sign out</button>
+    <div class="foot-mini">© 2026 LCG Wealth Platform<br>All investments carry risk. Only invest what you can afford to lose.</div>`;
+  content.querySelector('[data-copy-code]')?.addEventListener('click', () => ui.copyText(code, 'Referral code'));
+  content.querySelector('[data-sign-out]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await signOut(); }
+    catch (error) { button.disabled = false; ui.toast(error?.message || 'Could not sign out.', 'err'); }
+  });
+  app.dataset.liveReady = 'true';
+}
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(content, 'Loading your profile…');
+  try {
+    const [profileData, balanceData, investmentData] = await Promise.all([
+      getProfile(),
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/investments?action=getInvestments')
+    ]);
+    setTopbarBalance(balanceData.balance);
+    render(profileData, balanceData, investmentData);
+  } catch (error) {
+    showPageError(content, error, load);
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>

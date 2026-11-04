@@ -2,102 +2,120 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Deposit</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.deposit-page { max-width:680px; margin-inline:auto; }
+.deposit-note { display:flex; align-items:flex-start; gap:12px; line-height:1.55; }
+.deposit-note .ic-box { flex:0 0 38px; width:38px; height:38px; }
+.deposit-page .field + .field { margin-top:16px; }
+.deposit-page .btn-block { margin-top:18px; }
+.deposit-page .small { line-height:1.6; }
+@media(max-width:520px) {
+ .deposit-page { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+ .deposit-page .amt-display { padding:20px 12px; }
+ .deposit-page .amt-display .val { font-size:clamp(30px,9vw,38px); overflow-wrap:anywhere; }
+ .deposit-page .amt-chips { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false" aria-live="polite"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, money, escapeHTML, showPageError, showLoading } from '../assets/js/live-data.js';
+
 const app = document.getElementById('app');
-let selMethod = 'card';
-let selAmt = 0;
-const methods = [
-  { id: 'card', name: 'Debit / Credit card', sub: 'Visa, Mastercard, Verve · Instant', tone: 'jade', sym: '💳' },
-  { id: 'bank', name: 'Bank transfer', sub: 'GTBank, Access, Zenith · 5 min', tone: 'gold', sym: '🏦' },
-  { id: 'ussd', name: 'USSD', sub: '*737# · Quick code', tone: 'violet', sym: '📲' },
-  { id: 'crypto', name: 'USDT (crypto)', sub: 'TRC20 · ~3 min', tone: 'rose', sym: '◈' },
-];
-const chips = [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000];
-app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Deposit</h1>
-    <p>Funds are credited instantly and earn from day one.</p>
-  </div>
+const UI = window.LCGUI;
+const safeNumber = value => { const n = Number(value); return Number.isFinite(n) ? n : null; };
+const presets = [1000, 5000, 10000, 25000];
 
-  <div class="amt-display card">
-    <div class="lbl">Deposit amount</div>
-    <div class="val" id="amtVal"><span style="opacity:0.5;">₦</span>0</div>
-    <div class="small muted">Min ₦1,000 · No maximum</div>
-  </div>
+function shell(balance, content) {
+  app.innerHTML = `${UI.topbarHTML('me', balance)}<main class="page page-enter deposit-page">
+    <div class="page-head"><h1>Deposit</h1><p>Submit a manual transfer for review. A request does not credit your wallet immediately.</p></div>${content}
+  </main>${UI.bottomNavHTML('me')}`;
+}
 
-  <div class="amt-chips" id="chips">
-    ${chips.map((c,i)=>`<button class="amt-chip" data-amt="${c}" onclick="pickAmt(${c},this)">${c>=1000?(c/1000)+'K':'₦'+c}</button>`).join('')}
-  </div>
-
-  <div class="field">
-    <label for="custom">Or enter custom amount</label>
-    <div class="input-wrap">
-      <span class="lead" style="color:var(--jade-light);font-weight:600;left:16px;">₦</span>
-      <input class="input has-lead" id="custom" type="number" placeholder="0" min="1000" oninput="syncCustom(this)">
+function render(balance) {
+  shell(balance, `<div class="amt-display card card-pad">
+      <div class="lbl">Deposit amount</div>
+      <div class="val" id="amount-display">${escapeHTML(money(0))}</div>
+      <div class="small muted">Enter the transfer amount you want reviewed.</div>
     </div>
-  </div>
+    <div class="amt-chips" aria-label="Suggested amounts">${presets.map(value => `<button class="amt-chip" type="button" data-preset="${value}">${value >= 1000 ? `${value / 1000}K` : escapeHTML(money(value))}</button>`).join('')}</div>
+    <div class="field" style="margin-top:18px"><label for="deposit-amount">Transfer amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="deposit-amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" required></div></div>
+    <div class="field"><label for="sender-name">Sender name</label><input class="input" id="sender-name" type="text" maxlength="120" autocomplete="name" placeholder="Name used for the transfer" required></div>
+    <div class="field"><label for="payment-method">Payment method</label><div class="method on" aria-label="Bank transfer"><div class="ic-box gold" aria-hidden="true">${UI.icons.bank}</div><div class="body"><div class="t">Bank transfer</div><div class="s">Manual transfer request for review</div></div></div></div>
+    <div class="field"><label for="proof-ref">Transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference" required></div>
+    <div class="card card-pad" style="margin-top:18px"><div class="deposit-note"><div class="ic-box jade" aria-hidden="true">${UI.icons.info}</div><div class="small" style="color:var(--fg-soft)"><strong>Review required</strong><br>Submitting records your deposit request as pending. It is not a card or crypto payment and funds are not credited until the request is reviewed.</div></div></div>
+    <div id="deposit-result" aria-live="polite"></div>
+    <button class="btn btn-jade btn-block" id="submit-deposit" type="button">${UI.icons.deposit} Submit deposit request</button>`);
 
-  <div class="section-head" style="margin-top:8px;"><h2>Payment method</h2></div>
-  <div style="display:flex;flex-direction:column;gap:10px;" id="methods">
-    ${methods.map(m=>`
-      <button class="method ${m.id==='card'?'on':''}" data-mid="${m.id}" onclick="pickMethod('${m.id}',this)">
-        <div class="ic-box ${m.tone}" style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:rgba(255,255,255,0.04);">${m.sym}</div>
-        <div class="body">
-          <div class="t">${m.name}</div>
-          <div class="s">${m.sub}</div>
-        </div>
-        <div class="check on" style="${m.id==='card'?'':'opacity:0;'}" data-check="${m.id}"></div>
-      </button>
-    `).join('')}
-  </div>
+  const amountInput = document.getElementById('deposit-amount');
+  const amountDisplay = document.getElementById('amount-display');
+  const result = document.getElementById('deposit-result');
+  const submit = document.getElementById('submit-deposit');
+  amountInput.addEventListener('input', () => {
+    const amount = safeNumber(amountInput.value);
+    amountDisplay.textContent = money(amount !== null && amount > 0 ? amount : 0);
+    app.querySelectorAll('[data-preset]').forEach(button => button.classList.toggle('on', Number(button.dataset.preset) === amount));
+  });
+  app.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+    amountInput.value = button.dataset.preset;
+    amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+  submit.addEventListener('click', async () => {
+    const amount = safeNumber(amountInput.value);
+    const senderName = document.getElementById('sender-name').value.trim();
+    const proofRef = document.getElementById('proof-ref').value.trim();
+    if (amount === null || amount <= 0 || !senderName || !proofRef) {
+      UI.toast('Enter a valid amount, sender name and transfer reference.','err');
+      return;
+    }
+    submit.disabled = true;
+    submit.textContent = 'Submitting request…';
+    result.innerHTML = '';
+    try {
+      const response = await apiRequest('/api/wallet?action=submitDeposit', {
+        method: 'POST',
+        body: { amount, sender_name: senderName, payment_method: 'bank_transfer', proof_ref: proofRef }
+      });
+      const requestId = response?.deposit?.id ?? response?.id ?? response?.request_id ?? response?.reference;
+      result.innerHTML = `<div class="card card-pad" style="margin-top:14px" role="status"><strong>Deposit request submitted for review</strong><p class="small muted" style="margin:6px 0 0">Your request is pending review; no funds have been credited yet.${requestId ? `<br>Reference: ${escapeHTML(requestId)}` : ''}</p></div>`;
+      UI.toast('Deposit request submitted for review.','ok');
+      amountInput.value = '';
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('sender-name').value = '';
+      document.getElementById('proof-ref').value = '';
+    } catch (error) {
+      result.innerHTML = `<div class="data-state data-state-error" role="alert"><p>${escapeHTML(error?.message || 'Could not submit the request.')}</p></div>`;
+      UI.toast(error?.message || 'Could not submit deposit request.','err');
+    } finally {
+      submit.disabled = false;
+      submit.innerHTML = `${UI.icons.deposit} Submit deposit request`;
+    }
+  });
+  app.dataset.liveReady = 'true';
+}
 
-  <div class="card card-pad" style="background:rgba(16,185,129,0.05);border-color:rgba(52,211,153,0.18);">
-    <div class="flex gap-3 center">
-      <div class="ic-box jade" style="width:36px;height:36px;">${I.shield}</div>
-      <div class="small" style="color:var(--fg-soft);">Deposits above ₦50,000 unlock <b style="color:var(--jade-light);">priority withdrawals</b> and a bonus 0.5% on first payout.</div>
-    </div>
-  </div>
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(app, 'Loading your account…');
+  try {
+    const response = await apiRequest('/api/wallet?action=getBalance');
+    const balance = safeNumber(response?.balance);
+    if (balance === null) throw new Error('The wallet service returned an invalid balance.');
+    render(balance);
+  } catch (error) {
+    showPageError(app, error, load);
+    app.dataset.liveReady = 'true';
+  }
+}
 
-  <button class="btn btn-jade btn-block" onclick="confirmDeposit()">${I.deposit} Confirm deposit</button>
-</main>
-${bottomNavHTML('me')}
-`;
-
-function pickAmt(v, el){
-  selAmt = v;
-  document.querySelectorAll('.amt-chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on');
-  document.getElementById('custom').value = v;
-  document.getElementById('amtVal').innerHTML = '<span style="opacity:0.5;">₦</span>'+v.toLocaleString();
-}
-function syncCustom(input){
-  selAmt = parseInt(input.value)||0;
-  document.querySelectorAll('.amt-chip').forEach(c=>c.classList.remove('on'));
-  document.getElementById('amtVal').innerHTML = '<span style="opacity:0.5;">₦</span>'+selAmt.toLocaleString();
-}
-function pickMethod(id, el){
-  selMethod = id;
-  document.querySelectorAll('#methods .method').forEach(m=>m.classList.remove('on'));
-  el.classList.add('on');
-  document.querySelectorAll('[data-check]').forEach(c=>c.style.opacity='0');
-  document.querySelector('[data-check="'+id+'"]').style.opacity='1';
-}
-function confirmDeposit(){
-  if(selAmt < 1000){ toast('Minimum deposit is ₦1,000','err'); return; }
-  toast('Depositing ' + naira(selAmt) + ' via ' + methods.find(m=>m.id===selMethod).name + '…','info');
-  setTimeout(()=>toast('Deposit successful! Balance updated.','ok'), 1400);
-}
+load();
 </script>
 </body>
 </html>

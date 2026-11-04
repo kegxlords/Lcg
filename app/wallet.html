@@ -2,93 +2,139 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Wallet</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.wallet-page { max-width: 780px; margin-inline: auto; }
+.wallet-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.wallet-history-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin: 22px 0 12px; }
+.wallet-history-head h2 { margin:0; font-family:var(--f-display); font-size:18px; }
+.wallet-status { display:inline-flex; margin-top:5px; font-size:11px; color:var(--fg-muted); }
+.wallet-filter { display:flex; gap:8px; overflow-x:auto; padding:2px 2px 10px; scrollbar-width:none; }
+.wallet-filter::-webkit-scrollbar { display:none; }
+.wallet-filter .tab { flex:0 0 auto; }
+.wallet-page .row { min-width:0; }
+.wallet-page .row .end { min-width:112px; }
+.wallet-page .row .body .t,.wallet-page .row .body .s { overflow-wrap:anywhere; }
+@media(max-width:520px) {
+ .wallet-page { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+ .wallet-page .hero-balance { padding:22px 18px; }
+ .wallet-page .hero-balance .amount { font-size:clamp(27px,8vw,38px); overflow-wrap:anywhere; }
+ .wallet-actions { gap:9px; }
+ .wallet-actions .btn { height:48px; padding:0 12px; font-size:14px; }
+ .wallet-page .card-pad { padding:12px 14px; }
+ .wallet-page .row { gap:10px; }
+ .wallet-page .row .end { min-width:94px; }
+ .wallet-page .row .end .amt { font-size:12px; }
+}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false" aria-live="polite"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, money, escapeHTML, formatDate, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
+
 const app = document.getElementById('app');
-app.innerHTML = `
-${topbarHTML('me')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>Wallet</h1>
-    <p>Balance, earnings, and full transaction history.</p>
-  </div>
+const UI = window.LCGUI;
+const safeNumber = value => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+const textFrom = (item, keys, fallback = '') => {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') return String(value);
+  }
+  return fallback;
+};
+const categoryOf = item => {
+  const hint = `${item?.direction || ''} ${item?.type || ''} ${item?.category || ''} ${item?.kind || ''} ${item?.transaction_type || ''}`.toLowerCase();
+  if (/withdraw|outgoing|debit|purchase|investment_purchase|payment/.test(hint)) return 'out';
+  if (/deposit|income|credit|earning|top.?up|return|commission|wheel_win|bonus|payout/.test(hint)) return 'in';
+  return 'other';
+};
 
-  <div class="hero-balance">
-    <div class="label">Total balance</div>
-    <div class="amount"><span class="cur">₦</span>17,600<span style="font-size:18px;color:var(--fg-muted);font-family:var(--f-body);font-weight:500;">.00</span></div>
-    <div class="sub-row">
-      <div class="sub"><div class="k">Available</div><div class="v">${naira(LCG.user.available)}</div></div>
-      <div class="sub"><div class="k">Earnings</div><div class="v" style="color:var(--jade-light);">${naira(LCG.user.earnings)}</div></div>
+function renderShell(balance, content) {
+  app.innerHTML = `${UI.topbarHTML('me', balance)}
+    <main class="page page-enter wallet-page">
+      <div class="page-head"><h1>Wallet</h1><p>Your current balance and account transaction history.</p></div>
+      ${content}
+    </main>${UI.bottomNavHTML('me')}`;
+}
+
+function transactionRow(item, index) {
+  const dir = categoryOf(item);
+  const amount = safeNumber(item?.amount ?? item?.value ?? item?.amount_ngn);
+  const title = escapeHTML(textFrom(item, ['description','title','type','transaction_type','category'], 'Wallet transaction'));
+  const status = escapeHTML(textFrom(item, ['status','state'], ''));
+  const ref = textFrom(item, ['reference','proof_ref','transaction_ref','id'], '');
+  const date = formatDate(item?.created_at ?? item?.date ?? item?.timestamp ?? item?.createdAt, { dateStyle: 'medium', timeStyle: 'short' });
+  const iconName = dir === 'in' ? 'arrowDown' : dir === 'out' ? 'arrowUp' : 'wallet';
+  const tone = dir === 'in' ? 'jade' : dir === 'out' ? 'gold' : '';
+  const sign = amount === null ? '' : dir === 'in' ? '+' : dir === 'out' ? '−' : '';
+  const amountHTML = amount === null ? '—' : `${sign}${money(Math.abs(amount))}`;
+  return `<div class="row" data-cat="${dir}" data-transaction="${index}">
+    <div class="ic-box ${tone}" aria-hidden="true">${UI.icons[iconName] || UI.icons.wallet}</div>
+    <div class="body"><div class="t">${title}</div><div class="s">${escapeHTML(date)}${ref ? ` · ${escapeHTML(ref)}` : ''}</div>${status ? `<span class="wallet-status">${status}</span>` : ''}</div>
+    <div class="end"><div class="amt ${dir === 'in' ? 'up' : dir === 'out' ? 'down' : ''}">${amountHTML}</div></div>
+  </div>`;
+}
+
+function renderHistory(records) {
+  if (!records.length) return showEmpty('Your deposits, withdrawals and other wallet activity will appear here.');
+  return `<div class="list">${records.map(transactionRow).join('')}</div>`;
+}
+
+function render(balance, history) {
+  const records = Array.isArray(history.transactions) && history.transactions.length
+    ? history.transactions
+    : [...(Array.isArray(history.deposits) ? history.deposits.map(item => ({ ...item, direction: item.direction || 'in', type: item.type || 'Deposit' })) : []),
+       ...(Array.isArray(history.withdrawals) ? history.withdrawals.map(item => ({ ...item, direction: item.direction || 'out', type: item.type || 'Withdrawal' })) : [])];
+  const content = `<section class="hero-balance" aria-label="Current wallet balance">
+      <div class="label">Available wallet balance</div>
+      <div class="amount">${escapeHTML(money(balance))}</div>
+    </section>
+    <div class="wallet-actions" style="margin-top:16px">
+      <a href="deposit.html" class="btn btn-jade">${UI.icons.deposit} Deposit</a>
+      <a href="withdraw.html" class="btn btn-gold">${UI.icons.withdraw} Withdraw</a>
     </div>
-  </div>
-
-  <div class="grid-2">
-    <a href="deposit.html" class="btn btn-jade">${I.deposit} Deposit</a>
-    <a href="withdraw.html" class="btn btn-gold">${I.withdraw} Withdraw</a>
-  </div>
-
-  <div class="stat-row">
-    <div class="stat lux">
-      <div class="k">${I.arrowDown} Total deposited</div>
-      <div class="v">${nairaShort(120000)}</div>
-      <div class="delta up">▲ Lifetime</div>
+    <div class="wallet-history-head"><h2>Transactions</h2><span class="small muted">${records.length} ${records.length === 1 ? 'record' : 'records'}</span></div>
+    <div class="wallet-filter" role="tablist" aria-label="Filter transactions">
+      <button class="tab active" type="button" data-filter="all" aria-selected="true">All</button>
+      <button class="tab" type="button" data-filter="in" aria-selected="false">Incoming</button>
+      <button class="tab" type="button" data-filter="out" aria-selected="false">Outgoing</button>
     </div>
-    <div class="stat lux">
-      <div class="k">${I.arrowUp} Total withdrawn</div>
-      <div class="v">${nairaShort(93000)}</div>
-      <div class="delta muted">All time</div>
-    </div>
-  </div>
-
-  <div class="tabs" data-tabs="tx">
-    <button class="tab active" data-cat="all">All</button>
-    <button class="tab" data-cat="in">Income</button>
-    <button class="tab" data-cat="out">Outgoing</button>
-  </div>
-
-  <div class="card card-pad">
-    <div class="list">
-      ${LCG.transactions.map(t => `
-        <div class="row" data-cat="${t.dir}">
-          <div class="ic-box ${t.tone}">${I[t.ic]||I.coin}</div>
-          <div class="body">
-            <div class="t">${t.type}</div>
-            <div class="s">${t.sub}</div>
-          </div>
-          <div class="end">
-            <div class="amt ${t.dir==='in'?'up':'down'}">${t.dir==='in'?'+':'−'}${naira(t.amt)}</div>
-            <div class="ts">${t.ts}</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  </div>
-
-  <button class="btn btn-ghost btn-block" onclick="toast('Showing latest 6 transactions','info');">${I.refresh} Load more</button>
-</main>
-${bottomNavHTML('me')}
-`;
-
-// patch tabs for tx filter (data-cat on row)
-setTimeout(()=>{
-  const tabs = document.querySelectorAll('[data-tabs="tx"] .tab');
-  const panel = document.querySelector('[data-tab-panel="tx"]') || document.querySelector('.list').closest('.card');
-  tabs.forEach(t=>t.addEventListener('click',()=>{
-    tabs.forEach(x=>x.classList.remove('active'));t.classList.add('active');
-    const cat = t.dataset.cat;
-    document.querySelectorAll('.list .row').forEach(r=>{
-      r.style.display = (cat==='all'||r.dataset.cat===cat)?'flex':'none';
-    });
+    <section class="card card-pad" aria-label="Transaction history" id="transaction-card">${renderHistory(records)}</section>`;
+  renderShell(balance, content);
+  app.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
+    app.querySelectorAll('[data-filter]').forEach(tab => { tab.classList.toggle('active', tab === button); tab.setAttribute('aria-selected', String(tab === button)); });
+    app.querySelectorAll('[data-transaction]').forEach(row => { row.hidden = button.dataset.filter !== 'all' && row.dataset.cat !== button.dataset.filter; });
   }));
-},50);
+  app.dataset.liveReady = 'true';
+}
+
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(app, 'Loading your wallet…');
+  try {
+    const [balanceResult, history] = await Promise.all([
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/wallet?action=getHistory')
+    ]);
+    const balance = safeNumber(balanceResult?.balance);
+    if (balance === null) throw new Error('The wallet service returned an invalid balance.');
+    render(balance, history || {});
+  } catch (error) {
+    showPageError(app, error, load);
+    app.dataset.liveReady = 'true';
+  }
+}
+
+load();
 </script>
 </body>
 </html>

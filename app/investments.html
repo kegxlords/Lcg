@@ -2,88 +2,103 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — My Investments</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.investment-list{display:flex;flex-direction:column;gap:12px}.investment-card{min-width:0}.investment-name{overflow-wrap:anywhere}.investment-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.investment-meta .stat{min-width:0}@media(max-width:520px){.investment-meta{grid-template-columns:1fr 1fr}.investment-card.card-pad{padding:16px}.investment-heading{align-items:flex-start}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false" aria-busy="true"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, getProfile, money, escapeHTML, formatDate, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const summary = {
-  invested: LCG.user.invested,
-  active: 3,
-  daily: LCG.investments.filter(i=>i.status==='active').reduce((s,i)=>s+i.daily,0),
-  projected: LCG.investments.filter(i=>i.status==='active').reduce((s,i)=>s+i.daily*(i.days-i.day),0),
-};
-app.innerHTML = `
-${topbarHTML('orders')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>My investments</h1>
-    <p>Track active positions and projected returns.</p>
-  </div>
+const ui = window.LCGUI;
+const completedStatuses = new Set(['completed','complete','done','matured']);
 
-  <div class="hero-balance" style="padding:20px;">
-    <div class="label">Total invested</div>
-    <div class="amount" style="font-size:32px;"><span class="cur">₦</span>${LCG.user.invested.toLocaleString()}</div>
-    <div class="sub-row">
-      <div class="sub"><div class="k">Daily yield</div><div class="v" style="color:var(--jade-light);">${naira(summary.daily)}</div></div>
-      <div class="sub"><div class="k">Projected</div><div class="v">${nairaShort(summary.projected)}</div></div>
-      <div class="sub"><div class="k">Active</div><div class="v">${summary.active}</div></div>
+function dateProgress(item) {
+  const start = item.start_date ? new Date(item.start_date) : null;
+  const end = item.end_date ? new Date(item.end_date) : null;
+  if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end > start) {
+    const now = Date.now();
+    const percent = Math.max(0, Math.min(100, Math.round(((now - start.getTime()) / (end.getTime() - start.getTime())) * 100)));
+    return {percent: completedStatuses.has(String(item.status || '').toLowerCase()) ? 100 : percent, available: true};
+  }
+  if (completedStatuses.has(String(item.status || '').toLowerCase())) return {percent:100, available:true};
+  return {percent:0, available:false};
+}
+
+function investmentCard(item) {
+  const status = String(item.status || 'unknown');
+  const normalized = status.toLowerCase();
+  const dataCategory = normalized === 'active' ? 'active' : completedStatuses.has(normalized) ? 'done' : 'other';
+  const progress = dateProgress(item);
+  const name = item.products?.name || 'Investment';
+  return `<article class="card card-pad investment-card lux" data-cat="${dataCategory}">
+    <div class="flex between center investment-heading" style="gap:12px;flex-wrap:wrap">
+      <div class="flex gap-3 center" style="min-width:0"><div class="ic-box jade">${ui.icons.plans}</div><div style="min-width:0"><div class="investment-name" style="font-weight:650;font-size:16px">${escapeHTML(name)}</div><div class="small muted">${money(item.amount)} invested</div></div></div>
+      <span class="badge ${dataCategory === 'active' ? 'jade' : dataCategory === 'done' ? 'muted' : 'gold'}">${escapeHTML(status)}</span>
     </div>
-  </div>
+    <div style="margin-top:16px">
+      <div class="flex between center small" style="gap:8px"><span class="muted">${progress.available ? 'Timeline progress' : 'Timeline'}</span><span style="color:var(--jade-light);font-weight:600">${progress.available ? `${progress.percent}%` : 'Dates unavailable'}</span></div>
+      ${progress.available ? `<div class="progress" style="margin-top:7px" role="progressbar" aria-label="Timeline progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}"><i style="width:${progress.percent}%"></i></div>` : ''}
+    </div>
+    <div class="investment-meta">
+      <div class="stat" style="padding:12px"><div class="k">Start date</div><div class="v" style="font-size:15px">${escapeHTML(formatDate(item.start_date))}</div></div>
+      <div class="stat" style="padding:12px"><div class="k">End date</div><div class="v" style="font-size:15px">${escapeHTML(formatDate(item.end_date))}</div></div>
+    </div>
+  </article>`;
+}
 
-  <div class="tabs" data-tabs="inv">
-    <button class="tab active" data-cat="all">All</button>
-    <button class="tab" data-cat="active">Active</button>
-    <button class="tab" data-cat="done">Completed</button>
-  </div>
+function render(investments, balance) {
+  const activeCount = investments.filter((item)=>String(item.status || '').toLowerCase() === 'active').length;
+  const completedCount = investments.filter((item)=>completedStatuses.has(String(item.status || '').toLowerCase())).length;
+  const totalInvested = investments.reduce((sum,item)=>sum + Number(item.amount || 0),0);
+  app.innerHTML = `
+    ${ui.topbarHTML('orders', balance)}
+    <main class="page page-enter">
+      <div class="page-head"><h1>My investments</h1><p>Review your investment amounts, statuses, and date-based timelines.</p></div>
+      <section class="hero-balance" style="padding:20px" aria-label="Investment summary">
+        <div class="label">Total invested</div><div class="amount" style="font-size:clamp(27px,6vw,36px)">${money(totalInvested)}</div>
+        <div class="sub-row"><div class="sub"><div class="k">Positions</div><div class="v">${investments.length}</div></div><div class="sub"><div class="k">Active</div><div class="v">${activeCount}</div></div><div class="sub"><div class="k">Completed</div><div class="v">${completedCount}</div></div></div>
+      </section>
+      <div class="tabs" data-tabs="inv" role="tablist" aria-label="Filter investments"><button class="tab active" data-cat="all" type="button">All</button><button class="tab" data-cat="active" type="button">Active</button><button class="tab" data-cat="done" type="button">Completed</button></div>
+      <div class="investment-list" data-tab-panel="inv">${investments.length ? investments.map(investmentCard).join('') : showEmpty('Your investments will appear here after you make one.')}</div>
+      <a href="products.html" class="btn btn-ghost btn-block" style="margin-top:18px">${ui.icons.plus} Browse investment products</a>
+    </main>
+    ${ui.bottomNavHTML('orders')}`;
+  app.querySelectorAll('[data-tabs="inv"] .tab').forEach((button)=>button.addEventListener('click',()=>{
+    app.querySelectorAll('[data-tabs="inv"] .tab').forEach((tab)=>tab.classList.toggle('active',tab===button));
+    const filter = button.dataset.cat;
+    app.querySelectorAll('[data-tab-panel="inv"] [data-cat]').forEach((row)=>{row.style.display = filter === 'all' || row.dataset.cat === filter ? '' : 'none';});
+  }));
+  app.setAttribute('aria-busy','false');
+}
 
-  <div data-tab-panel="inv" style="display:flex;flex-direction:column;gap:14px;">
-    ${LCG.investments.map((inv,idx) => {
-      const pct = Math.round(inv.day/inv.days*100);
-      const dataCat = inv.status;
-      return `
-      <div class="card card-pad lux" data-cat="${dataCat}">
-        <div class="flex between center">
-          <div class="flex gap-3 center">
-            <div class="ic-box jade">${I.plans}</div>
-            <div>
-              <div style="font-weight:600;font-size:15px;">${inv.plan}</div>
-              <div class="small muted">${naira(inv.amount)} invested</div>
-            </div>
-          </div>
-          <span class="badge ${inv.status==='active'?'jade':'muted'}">${inv.status}</span>
-        </div>
-        <div style="margin-top:16px;">
-          <div class="flex between center small">
-            <span class="muted">Day ${inv.day} of ${inv.days}</span>
-            <span style="color:var(--jade-light);font-weight:600;">${pct}%</span>
-          </div>
-          <div class="progress" style="margin-top:6px;"><i style="width:${pct}%"></i></div>
-        </div>
-        <div class="grid-2" style="margin-top:14px;">
-          <div class="stat" style="padding:12px;">
-            <div class="k">Daily payout</div>
-            <div class="v" style="font-size:18px;color:var(--jade-light);">${naira(inv.daily)}</div>
-          </div>
-          <div class="stat" style="padding:12px;">
-            <div class="k">Total projected</div>
-            <div class="v" style="font-size:18px;">${naira(inv.daily*inv.days)}</div>
-          </div>
-        </div>
-      </div>`;
-    }).join('')}
-  </div>
-
-  <a href="products.html" class="btn btn-ghost btn-block">${I.plus} Invest in a new plan</a>
-</main>
-${bottomNavHTML('orders')}
-`;
+async function load() {
+  app.dataset.liveReady = 'false';
+  app.setAttribute('aria-busy','true');
+  showLoading(app,'Loading your investments…');
+  try {
+    const [profileData, balanceData, investmentData] = await Promise.all([
+      getProfile(),
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/investments?action=getInvestments')
+    ]);
+    void profileData;
+    render(Array.isArray(investmentData?.investments) ? investmentData.investments : [], Number(balanceData?.balance || 0));
+    app.dataset.liveReady = 'true';
+  } catch (error) {
+    showPageError(app,error,load);
+    app.setAttribute('aria-busy','false');
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>

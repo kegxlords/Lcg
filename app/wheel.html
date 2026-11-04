@@ -2,83 +2,124 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — Lucky Wheel</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.wheel-hero { text-align:center; padding:24px 18px; background:radial-gradient(circle at 50% 10%,rgba(231,200,115,.13),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.02)); }
+.reward-disc { width:min(68vw,250px); aspect-ratio:1; margin:4px auto 20px; border-radius:50%; display:grid; place-items:center; position:relative; border:8px solid rgba(231,200,115,.8); box-shadow:0 0 0 7px rgba(231,200,115,.10),0 0 38px rgba(231,200,115,.18); background:radial-gradient(circle,rgba(16,185,129,.22) 0 32%,rgba(16,185,129,.08) 33% 64%,rgba(231,200,115,.15) 65% 100%); transition:transform 1.8s cubic-bezier(.15,.7,.1,1); }
+.reward-disc::before,.reward-disc::after { content:''; position:absolute; border:1px solid rgba(231,200,115,.45); border-radius:50%; inset:12px; }
+.reward-disc::after { inset:27px; border-color:rgba(255,255,255,.10); }
+.reward-disc.spinning { transform:rotate(900deg); }
+.reward-label { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px; }
+.reward-label svg { width:28px;height:28px;color:var(--gold-light); }
+.reward-amount { font:700 clamp(23px,7vw,32px)/1.15 var(--f-display); color:var(--gold-light); overflow-wrap:anywhere; }
+.wheel-button { max-width:340px; margin:0 auto; }
+.wheel-history-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 2px; border-bottom:1px solid var(--border); }
+.wheel-history-row:last-child { border-bottom:0; }
+.wheel-history-row .amount { color:var(--jade-light); font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+@media (min-width:560px) { .page { max-width:600px; margin:0 auto; } .wheel-hero { padding:30px; } }
+@media (prefers-reduced-motion:reduce) { .reward-disc { transition:none; } }
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, escapeHTML, formatDate, money, showEmpty, showLoading, showPageError } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const seg = 360 / LCG.wheelPrizes.length;
-const tones = { jade: '#10b981', gold: '#e7c873', violet: '#a78bfa', muted: '#3a423d' };
-let wheelHTML = '';
-LCG.wheelPrizes.forEach((p, i) => {
-  const a0 = i * seg - 90;
-  const a1 = (i + 1) * seg - 90;
-  const color = tones[p.tone];
-  const cx = 50, cy = 50, r = 50;
-  const x0 = cx + r * Math.cos(a0 * Math.PI / 180);
-  const y0 = cy + r * Math.sin(a0 * Math.PI / 180);
-  const x1 = cx + r * Math.cos(a1 * Math.PI / 180);
-  const y1 = cy + r * Math.sin(a1 * Math.PI / 180);
-  wheelHTML += `<path d="M${cx},${cy} L${x0},${y0} A${r},${r} 0 0,1 ${x1},${y1} Z" fill="${color}" fill-opacity="0.85" stroke="rgba(0,0,0,0.3)" stroke-width="0.5"/>`;
-  const mid = (a0 + a1) / 2;
-  const tx = cx + (r * 0.65) * Math.cos(mid * Math.PI / 180);
-  const ty = cy + (r * 0.65) * Math.sin(mid * Math.PI / 180);
-  wheelHTML += `<text x="${tx}" y="${ty}" fill="#04120c" font-size="6" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(${mid+90} ${tx} ${ty})">${p.label}</text>`;
-});
-app.innerHTML = `
-${topbarHTML('home')}
-<main class="page page-enter" style="align-items:center;">
-  <div class="page-head" style="text-align:center;width:100%;">
-    <h1>Lucky wheel</h1>
-    <p style="margin:0 auto;max-width:280px;">One free spin daily. Win cash, bonuses, or VIP perks.</p>
-  </div>
+const { icons, topbarHTML, bottomNavHTML, toast } = window.LCGUI;
+const mainShell = `
+  <header class="topbar"><a href="dashboard.html" class="brand"><span class="logo-dot">L</span><span>LCG</span></a><span class="badge gold">${icons.wheel} Lucky wheel</span></header>
+  <main class="page page-enter">
+    <div class="page-head"><h1>Lucky wheel</h1><p>View the configured reward and your claimed spin history.</p></div>
+    <section class="card wheel-hero" aria-labelledby="reward-heading">
+      <div class="reward-disc" id="reward-disc" aria-hidden="true"><div class="reward-label">${icons.gift}<span class="small muted">Configured fixed reward</span><strong class="reward-amount" id="reward-amount">—</strong></div></div>
+      <h2 id="reward-heading" style="font:600 17px var(--f-display);">Fixed reward</h2>
+      <p class="small muted" style="margin:5px auto 18px;max-width:340px;">The reward amount shown is the amount configured by the service. Spin availability is confirmed by the server when you choose to spin.</p>
+      <button class="btn btn-jade btn-block wheel-button" id="spin-button" type="button">${icons.wheel} Spin</button>
+      <div id="spin-result" aria-live="polite" style="margin-top:14px;"></div>
+    </section>
+    <section aria-labelledby="history-heading">
+      <div class="section-head" style="margin-bottom:8px;"><h2 id="history-heading">Claimed spin history</h2></div>
+      <div class="card card-pad" id="history-list">${showLoading(document.createElement('div'),'Loading spin history…')}</div>
+    </section>
+    <div id="page-error"></div>
+  </main>
+  ${bottomNavHTML('home')}`;
 
-  <div class="card card-pad" style="background:linear-gradient(160deg,rgba(167,139,250,0.1),rgba(16,185,129,0.05));width:100%;text-align:center;">
-    <div class="flex between center" style="margin-bottom:4px;">
-      <div class="badge violet">Daily free</div>
-      <div class="small muted">${I.clock} Resets in 14h 32m</div>
-    </div>
-  </div>
+app.innerHTML = mainShell;
+let rewardAmount = null;
+let busy = false;
 
-  <div class="wheel-wrap">
-    <div class="wheel-pointer"></div>
-    <div class="wheel" data-wheel>
-      <svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block;border-radius:50%;">
-        ${wheelHTML}
-      </svg>
-    </div>
-    <div class="wheel-hub" onclick="spinWheel()">SPIN</div>
-  </div>
+function renderHistory(rows) {
+  const target = document.getElementById('history-list');
+  if (!Array.isArray(rows) || rows.length === 0) {
+    target.innerHTML = showEmpty('Claimed spins will appear here.');
+    return;
+  }
+  target.innerHTML = rows.map((row) => `<div class="wheel-history-row"><div><div style="font-weight:600;">Claimed reward</div><div class="small muted">${escapeHTML(formatDate(row.created_at,{dateStyle:'medium',timeStyle:'short'}))}</div></div><span class="amount">${escapeHTML(money(row.amount_won))}</span></div>`).join('');
+}
 
-  <button class="btn btn-jade btn-block" onclick="spinWheel()">${I.wheel} Spin the wheel</button>
+async function loadPage() {
+  app.dataset.liveReady = 'false';
+  const errorTarget = document.getElementById('page-error');
+  errorTarget.innerHTML = '';
+  document.getElementById('spin-button').disabled = true;
+  showLoading(document.getElementById('history-list'),'Loading spin history…');
+  try {
+    const [config, history] = await Promise.all([
+      apiRequest('/api/wheel?action=getConfig'),
+      apiRequest('/api/wheel?action=getHistory')
+    ]);
+    rewardAmount = config.fixed_prize === null || config.fixed_prize === undefined || config.fixed_prize === '' ? NaN : Number(config.fixed_prize);
+    document.getElementById('reward-amount').textContent = Number.isFinite(rewardAmount) ? money(rewardAmount) : 'Not configured';
+    renderHistory(history.history);
+    document.getElementById('spin-button').disabled = !Number.isFinite(rewardAmount) || rewardAmount < 0;
+    app.dataset.liveReady = 'true';
+  } catch (error) {
+    showPageError(errorTarget,error,loadPage);
+    document.getElementById('history-list').innerHTML = showEmpty('History could not be loaded.');
+    app.dataset.liveReady = 'true';
+  }
+}
 
-  <div class="section-head" style="width:100%;"><h2>Prize pool</h2></div>
-  <div class="grid-2" style="width:100%;">
-    ${LCG.wheelPrizes.map(p => `
-      <div class="stat" style="padding:12px;">
-        <div class="k" style="color:${tones[p.tone]};">${p.tone==='muted'?'—':''}${p.label}</div>
-      </div>
-    `).join('')}
-  </div>
+async function spin() {
+  if (busy || !Number.isFinite(rewardAmount)) return;
+  busy = true;
+  const button = document.getElementById('spin-button');
+  const disc = document.getElementById('reward-disc');
+  const result = document.getElementById('spin-result');
+  button.disabled = true;
+  button.textContent = 'Spinning…';
+  disc.classList.add('spinning');
+  result.innerHTML = '';
+  try {
+    const response = await apiRequest('/api/wheel?action=spin',{method:'POST',body:{}});
+    if (!response.success) throw new Error('The spin was not completed.');
+    const prize = Number(response.prize);
+    result.innerHTML = `<div class="badge jade">Reward credited: ${escapeHTML(money(prize))}</div>${response.new_balance !== undefined ? `<p class="small muted" style="margin-top:6px;">New balance: ${escapeHTML(money(response.new_balance))}</p>` : ''}`;
+    toast(`Reward credited: ${money(prize)}`,'ok');
+    try {
+      const history = await apiRequest('/api/wheel?action=getHistory');
+      renderHistory(history.history);
+    } catch (_) {
+      result.insertAdjacentHTML('beforeend','<p class="small muted" style="margin-top:8px;">Reward was credited, but spin history could not be refreshed.</p>');
+    }
+  } catch (error) {
+    result.innerHTML = `<p class="small" role="alert" style="color:#fb7185;">${escapeHTML(error.message || 'Could not complete the spin.')}</p>`;
+  } finally {
+    disc.classList.remove('spinning');
+    button.innerHTML = `${icons.wheel} Spin`;
+    button.disabled = false;
+    busy = false;
+  }
+}
 
-  <div class="card card-pad" style="width:100%;">
-    <div style="font-weight:600;font-size:14px;margin-bottom:10px;">How it works</div>
-    <ul style="list-style:none;display:flex;flex-direction:column;gap:8px;">
-      <li class="flex gap-3"><span class="badge jade" style="flex-shrink:0;">1</span><span class="small" style="color:var(--fg-soft);">Each account gets one free spin every 24 hours.</span></li>
-      <li class="flex gap-3"><span class="badge jade" style="flex-shrink:0;">2</span><span class="small" style="color:var(--fg-soft);">Cash prizes are credited instantly to your earnings balance.</span></li>
-      <li class="flex gap-3"><span class="badge jade" style="flex-shrink:0;">3</span><span class="small" style="color:var(--fg-soft);">Bonus prizes (VIP boosts, extra spins) apply automatically.</span></li>
-      <li class="flex gap-3"><span class="badge jade" style="flex-shrink:0;">4</span><span class="small" style="color:var(--fg-soft);">Players on a 7-day streak get a guaranteed minimum ₦100 prize.</span></li>
-    </ul>
-  </div>
-</main>
-${bottomNavHTML('home')}
-`;
+document.getElementById('spin-button').addEventListener('click',spin);
+await loadPage();
 </script>
 </body>
 </html>

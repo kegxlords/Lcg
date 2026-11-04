@@ -2,96 +2,77 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#060907">
 <title>LCG — My Team</title>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
+<style>
+.team-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.team-stat{min-width:0;padding:13px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.035)}.team-stat .k{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}.team-stat .v{font:700 clamp(15px,4vw,20px)/1.2 var(--f-display);margin-top:5px;overflow-wrap:anywhere}.data-list{display:flex;flex-direction:column}.data-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border);min-width:0}.data-row:last-child{border-bottom:0;padding-bottom:0}.data-row:first-child{padding-top:0}.data-row .body{min-width:0;flex:1}.data-row .title{font-weight:600;font-size:14px;overflow-wrap:anywhere}.data-row .sub{font-size:12px;color:var(--fg-muted);margin-top:2px}.data-row .end{text-align:right;white-space:nowrap}.data-row .amount{font:600 14px var(--f-display);font-variant-numeric:tabular-nums}.data-row .amount.up{color:var(--jade-light)}.team-hero{background:radial-gradient(120% 80% at 0 0,rgba(231,200,115,.14),transparent 55%),radial-gradient(120% 80% at 100% 100%,rgba(16,185,129,.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))}
+@media(min-width:700px){.app{max-width:760px}.team-stats{gap:14px}.team-stat{padding:17px}.team-stat .v{font-size:23px}}
+</style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app" data-live-ready="false"></div>
 <script src="../assets/js/app.js"></script>
-<script>
+<script type="module">
+import { apiRequest, money, escapeHTML, formatDate, showPageError, showLoading, showEmpty } from '../assets/js/live-data.js';
 const app = document.getElementById('app');
-const teamBonus = LCG.team.reduce((s,m)=>s+m.earned,0);
-app.innerHTML = `
-${topbarHTML('team')}
-<main class="page page-enter">
-  <div class="page-head">
-    <h1>My team</h1>
-    <p>Invite, track referrals, and grow your network.</p>
-  </div>
-
-  <!-- referral card -->
-  <div class="hero-balance" style="background:radial-gradient(120% 80% at 0% 0%,rgba(231,200,115,0.15),transparent 55%),radial-gradient(120% 80% at 100% 100%,rgba(16,185,129,0.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));">
-    <div class="label" style="color:var(--gold-light);">${I.gift} Your referral code</div>
-    <div class="flex between center" style="margin-top:8px;">
-      <div style="font-family:var(--f-display);font-size:24px;font-weight:700;letter-spacing:0.04em;">${LCG.user.referralCode}</div>
-      <button class="btn btn-ghost btn-sm" onclick="copyText('${LCG.user.referralCode}','Code')">${I.copy} Copy</button>
-    </div>
-    <div class="sub-row">
-      <div class="sub"><div class="k">Team size</div><div class="v">${LCG.user.teamSize}</div></div>
-      <div class="sub"><div class="k">Active</div><div class="v" style="color:var(--jade-light);">${LCG.team.filter(m=>m.active).length}</div></div>
-      <div class="sub"><div class="k">Total bonus</div><div class="v">${naira(teamBonus)}</div></div>
-    </div>
-  </div>
-
-  <!-- bonus structure -->
-  <div class="card card-pad">
-    <div style="font-weight:600;font-size:14px;margin-bottom:12px;">Bonus structure</div>
-    <div class="grid-2">
-      <div class="stat" style="padding:14px;">
-        <div class="k">Level 1 (direct)</div>
-        <div class="v text-jade-grad" style="font-size:22px;">10%</div>
-        <div class="small muted">of referral deposits</div>
-      </div>
-      <div class="stat" style="padding:14px;">
-        <div class="k">Level 2 (indirect)</div>
-        <div class="v text-gold-grad" style="font-size:22px;">3%</div>
-        <div class="small muted">of sub-referrals</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- share actions -->
-  <div class="grid-2">
-    <button class="btn btn-jade" onclick="toast('Share link copied','ok');copyText('https://lcg.io/r/${LCG.user.referralCode}','Invite link')">${I.share} Share link</button>
-    <button class="btn btn-ghost" onclick="toast('QR code ready','info');">${I.qr} Show QR</button>
-  </div>
-
-  <!-- members -->
-  <div class="section-head"><h2>Team members</h2><span class="small muted">${LCG.team.length} of ${LCG.user.teamSize}</span></div>
-  <div class="card card-pad">
-    <div class="list">
-      ${LCG.team.map(m => `
-        <div class="row">
-          <div class="avatar ${m.tone}" style="width:38px;height:38px;font-size:14px;">${m.avatar}</div>
-          <div class="body">
-            <div class="t">${m.name} ${m.active?'<span class="dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 6px var(--jade-light);margin-left:4px;vertical-align:middle;"></span>':''}</div>
-            <div class="s">${m.uid} · ${m.tier} · joined ${m.joined}</div>
-          </div>
-          <div class="end">
-            <div class="amt up">+${naira(m.earned)}</div>
-            <div class="ts">${m.active?'Active':'Inactive'}</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-  </div>
-
-  <div class="card card-pad lux" style="background:linear-gradient(160deg,rgba(231,200,115,0.08),rgba(255,255,255,0.02));border-color:rgba(231,200,115,0.18);">
-    <div class="flex gap-3 center">
-      <div class="ic-box gold" style="width:42px;height:42px;">${I.fire}</div>
-      <div style="flex:1;">
-        <div style="font-weight:600;font-size:14px;">Reach Gold +5 members</div>
-        <div class="small muted" style="margin-top:2px;">Unlock Platinum tier with 0.6% withdrawal fee.</div>
-        <div class="progress gold" style="margin-top:10px;"><i style="width:${Math.round(LCG.user.teamSize/80*100)}%;"></i></div>
-      </div>
-    </div>
-  </div>
-</main>
-${bottomNavHTML('team')}
-`;
+const ui = window.LCGUI;
+app.dataset.liveReady = 'false';
+app.innerHTML = `${ui.topbarHTML('team', 0)}<main class="page page-enter" id="pageContent" aria-live="polite"></main>${ui.bottomNavHTML('team')}`;
+const content = document.getElementById('pageContent');
+const amount = (value) => money(Number(value) || 0);
+const maskedName = (value) => {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Member';
+  const mask = part => `${part.slice(0, 1)}${'•'.repeat(Math.min(6, Math.max(3, part.length - 1)))}`;
+  if (parts.length === 1) return mask(parts[0]);
+  return `${mask(parts[0])} ${parts[parts.length - 1].slice(0, 1)}.`;
+};
+function setTopbarBalance(balance) {
+  document.querySelector('.topbar')?.remove();
+  app.insertAdjacentHTML('afterbegin', ui.topbarHTML('team', Number(balance) || 0));
+}
+function render(referral, downlines, commissions) {
+  const code = String(referral.referral_code || '');
+  const teamDeposit = Number(referral.team_deposit) || 0;
+  const active = Number(referral.active_downlines) || 0;
+  const spins = Number(referral.available_spins) || 0;
+  const earned = commissions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const codeBox = code ? `<div class="flex between center" style="gap:12px;margin-top:8px;flex-wrap:wrap"><div class="ref-code" style="font:700 clamp(20px,5vw,26px) var(--f-display);letter-spacing:.04em;overflow-wrap:anywhere">${escapeHTML(code)}</div><button class="btn btn-ghost btn-sm" type="button" data-copy-code>${ui.icons.copy} Copy code</button></div>` : `<p class="small muted" style="margin-top:8px">A referral code is not available for this account.</p>`;
+  const downlineList = downlines.length ? `<div class="data-list">${downlines.map(person => {
+    const name = maskedName(person.full_name);
+    const initial = escapeHTML((String(person.full_name || '').trim()[0] || 'M').toUpperCase());
+    return `<div class="data-row"><div class="avatar" aria-hidden="true">${initial}</div><div class="body"><div class="title">${escapeHTML(name)}</div><div class="sub">Joined ${escapeHTML(formatDate(person.created_at))}</div></div><div class="end"><div class="amount">${amount(person.total_personal_deposit)}</div><div class="sub">Personal deposits</div></div></div>`;
+  }).join('')}</div>` : showEmpty('Your team members will appear here when someone joins through your referral.');
+  const commissionList = commissions.length ? `<div class="data-list">${commissions.map(item => `<div class="data-row"><div class="ic-box jade" aria-hidden="true">${ui.icons.coin}</div><div class="body"><div class="title">Referral commission</div><div class="sub">${escapeHTML(item.type || 'Commission')} · ${escapeHTML(formatDate(item.created_at))}</div></div><div class="end"><div class="amount up">+${amount(item.amount)}</div></div></div>`).join('')}</div>` : showEmpty('Referral commissions will appear here when they are recorded.');
+  content.innerHTML = `
+    <header class="page-head"><h1>My team</h1><p>Track your referrals and the deposits generated by your network.</p></header>
+    <section class="hero-balance team-hero" aria-label="Referral overview"><div class="label" style="color:var(--gold-light)">${ui.icons.gift} Your referral code</div>${codeBox}<div class="team-stats" style="margin-top:20px"><div class="team-stat"><div class="k">Team deposits</div><div class="v">${amount(teamDeposit)}</div></div><div class="team-stat"><div class="k">Downlines</div><div class="v">${downlines.length.toLocaleString('en-NG')}</div></div><div class="team-stat"><div class="k">Active downlines</div><div class="v" style="color:var(--jade-light)">${active.toLocaleString('en-NG')}</div></div></div><div class="small muted" style="margin-top:12px">Available spins: ${spins.toLocaleString('en-NG')}</div></section>
+    <section class="card card-pad"><div class="section-head" style="padding:0 0 12px"><h2>Team members</h2><span class="small muted">${downlines.length.toLocaleString('en-NG')} total</span></div>${downlineList}</section>
+    <section class="card card-pad"><div class="section-head" style="padding:0 0 12px"><h2>Referral commissions</h2><span class="small muted">${amount(earned)} total</span></div>${commissionList}</section>`;
+  if (code) content.querySelector('[data-copy-code]')?.addEventListener('click', () => ui.copyText(code, 'Referral code'));
+  app.dataset.liveReady = 'true';
+}
+async function load() {
+  app.dataset.liveReady = 'false';
+  showLoading(content, 'Loading your team…');
+  try {
+    const [balanceData, referralData, downlineData, commissionData] = await Promise.all([
+      apiRequest('/api/wallet?action=getBalance'),
+      apiRequest('/api/referrals?action=getReferralInfo'),
+      apiRequest('/api/referrals?action=getDownlines'),
+      apiRequest('/api/referrals?action=getCommissions')
+    ]);
+    setTopbarBalance(balanceData.balance);
+    render(referralData || {}, Array.isArray(downlineData?.downlines) ? downlineData.downlines : [], Array.isArray(commissionData?.commissions) ? commissionData.commissions : []);
+  } catch (error) {
+    showPageError(content, error, load);
+    app.dataset.liveReady = 'true';
+  }
+}
+load();
 </script>
 </body>
 </html>
