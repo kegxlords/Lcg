@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { verifyUser } from '../lib/auth.js';
+import { sendAtomicRpcError } from '../lib/atomic-rpc.js';
 
 export default async function handler(req, res) {
   const action = req.query.action;
@@ -31,40 +32,10 @@ async function getHistory(userId, res) {
 async function spin(req, userId, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 1. Find an unclaimed spin
-  const { data: spinRecord, error: findError } = await supabaseAdmin
-    .from('wheel_spins')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('is_claimed', false)
-    .limit(1)
-    .single();
-
-  if (findError || !spinRecord) {
-    return res.status(400).json({ error: 'No available spins. Deposit or invest to earn more!' });
-  }
-
-  // 2. Get the admin-set fixed prize
-  const { data: config } = await supabaseAdmin.from('wheel_config').select('fixed_prize_amount').eq('id', 1).single();
-  const prizeAmount = Number(config?.fixed_prize_amount || 600);
-
-  // 3. Update the spin record
-  await supabaseAdmin.from('wheel_spins').update({ is_claimed: true, amount_won: prizeAmount }).eq('id', spinRecord.id);
-
-  // 4. Credit Wallet
-  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', userId).single();
-  const newBalance = Number(wallet?.balance || 0) + prizeAmount;
-  await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', userId);
-
-  // 5. Log Transaction
-  await supabaseAdmin.from('transactions').insert({
-    user_id: userId,
-    type: 'wheel_win',
-    amount: prizeAmount,
-    status: 'approved',
-    reference: `WHEEL_${spinRecord.id.slice(0, 8).toUpperCase()}`,
-    description: `Lucky Wheel Win`
+  const { data, error } = await supabaseAdmin.rpc('claim_wheel_spin_atomic', {
+    p_user_id: userId
   });
+  if (error) return sendAtomicRpcError(res, error, 'wheel spin');
 
-  return res.json({ success: true, prize: prizeAmount, new_balance: newBalance });
+  return res.status(200).json(data);
 }

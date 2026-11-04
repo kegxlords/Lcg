@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../lib/supabase.js';
 import { verifyUser, getProfile } from '../lib/auth.js';
+import { sendAtomicRpcError } from '../lib/atomic-rpc.js';
 
 export default async function handler(req, res) {
   const action = req.query.action;
@@ -94,67 +95,45 @@ async function submitDeposit(req, userId, res) {
 async function requestWithdrawal(req, userId, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { amount, bank_name, account_number, account_name } = req.body;
+  const { amount, bank_name, account_number, account_name } = req.body || {};
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return res.status(400).json({ error: 'Enter a valid withdrawal amount' });
+  }
 
   // Get settings
-  const { data: settings } = await supabaseAdmin.from('site_settings').select('key, value');
+  const { data: settings, error: settingsError } = await supabaseAdmin.from('site_settings').select('key, value');
+  if (settingsError) return res.status(500).json({ error: 'Unable to load withdrawal settings.' });
   const settingsMap = {};
   settings?.forEach(s => settingsMap[s.key] = s.value);
   
   const minWithdrawal = Number(settingsMap['min_withdrawal'] || 1000);
   const feePercentage = Number(settingsMap['withdrawal_fee_percentage'] || 0);
 
-  if (!amount || Number(amount) < minWithdrawal) {
+  if (!Number.isFinite(minWithdrawal) || minWithdrawal < 0 ||
+      !Number.isFinite(feePercentage) || feePercentage < 0 || feePercentage > 100) {
+    return res.status(500).json({ error: 'Withdrawal settings are invalid' });
+  }
+
+  if (numericAmount < minWithdrawal) {
     return res.status(400).json({ error: `Minimum withdrawal is ₦${minWithdrawal.toLocaleString()}` });
   }
-  if (!bank_name || !account_number || !account_name) {
+  if (typeof bank_name !== 'string' || !bank_name.trim() ||
+      typeof account_number !== 'string' || !account_number.trim() ||
+      typeof account_name !== 'string' || !account_name.trim()) {
     return res.status(400).json({ error: 'All bank details are required' });
   }
 
-  // Check balance
-  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', userId).single();
-  const currentBalance = Number(wallet?.balance || 0);
-  
-  if (currentBalance < Number(amount)) {
-    return res.status(400).json({ error: 'Insufficient balance' });
-  }
-
-  // Calculate fee and net amount
-  const fee = (Number(amount) * feePercentage) / 100;
-  const netAmount = Number(amount) - fee;
-
-  // Deduct balance immediately (prevents double spending)
-  const { error: walletError } = await supabaseAdmin
-    .from('wallets')
-    .update({ balance: currentBalance - Number(amount), updated_at: new Date().toISOString() })
-    .eq('user_id', userId);
-  if (walletError) return res.status(500).json({ error: walletError.message });
-
-  // Create withdrawal record
-  const { data: withdrawal, error } = await supabaseAdmin
-    .from('withdrawals')
-    .insert({
-      user_id: userId,
-      amount: Number(amount),
-      bank_name,
-      account_number,
-      account_name,
-      status: 'pending'
-    })
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  // Log pending transaction
-  await supabaseAdmin.from('transactions').insert({
-    user_id: userId,
-    type: 'withdrawal',
-    amount: Number(amount),
-    status: 'pending',
-    reference: `WD_${withdrawal.id.slice(0, 8).toUpperCase()}`,
-    description: `Withdrawal request: ₦${Number(amount).toLocaleString()} (Fee: ₦${fee.toLocaleString()})`
+  const { data, error } = await supabaseAdmin.rpc('request_withdrawal_atomic', {
+    p_user_id: userId,
+    p_amount: numericAmount,
+    p_bank_name: bank_name.trim(),
+    p_account_number: account_number.trim(),
+    p_account_name: account_name.trim(),
+    p_min_withdrawal: minWithdrawal,
+    p_fee_percentage: feePercentage
   });
+  if (error) return sendAtomicRpcError(res, error, 'withdrawal');
 
-  return res.status(201).json({ success: true, withdrawal, fee, net_amount: netAmount });
+  return res.status(201).json(data);
 }
