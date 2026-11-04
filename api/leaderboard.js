@@ -8,7 +8,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, referral_code, total_team_deposit')
+      .select('id, full_name, total_team_deposit')
       .order('total_team_deposit', { ascending: false })
       .limit(10);
 

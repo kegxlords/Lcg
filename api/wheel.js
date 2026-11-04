@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     switch (action) {
       case 'getConfig': return await getConfig(res);
       case 'getHistory': return await getHistory(user.id, res);
-      case 'spin': return await spin(user.id, res);
+      case 'spin': return await spin(req, user.id, res);
       default: return res.status(400).json({ error: 'Invalid action' });
     }
   } catch (error) {
@@ -28,7 +28,7 @@ async function getHistory(userId, res) {
   return res.json({ history: data || [] });
 }
 
-async function spin(userId, res) {
+async function spin(req, userId, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // 1. Find an unclaimed spin
