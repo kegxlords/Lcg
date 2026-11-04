@@ -10,13 +10,17 @@ export default async function handler(req, res) {
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, phone, referral_code, tier, total_personal_deposit, total_team_deposit, active_downlines, created_at')
+      .select('id, full_name, email, referral_code, total_personal_deposit, total_team_deposit, active_downlines, created_at')
       .eq('id', user.id)
       .maybeSingle();
 
     if (error) return res.status(500).json({ error: 'Could not load profile.' });
     return res.json({
-      user: { id: user.id, email: user.email || profile?.email || '' },
+      user: {
+        id: user.id,
+        email: user.email || profile?.email || '',
+        phone: user.phone || user.user_metadata?.phone || user.user_metadata?.phone_number || ''
+      },
       profile: profile || null
     });
   } catch (error) {
