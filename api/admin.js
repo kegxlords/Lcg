@@ -36,7 +36,8 @@ export default async function handler(req, res) {
       
       // Wheel
       case 'getWheelConfig': return await getWheelConfig(res);
-      case 'saveWheelConfig': return await saveWheelConfig(req, res);
+      case 'saveWheelSegment': return await saveWheelSegment(req, res);
+      case 'deleteWheelSegment': return await deleteWheelSegment(req, res);
       case 'getSpins': return await getSpins(res);
       
       // Special VIPs
@@ -248,14 +249,42 @@ async function deleteProduct(req, res) {
 // WHEEL
 // ==========================================
 async function getWheelConfig(res) {
-  const { data } = await supabaseAdmin.from('wheel_config').select('*').eq('id', 1).single();
-  return res.json({ config: data });
+  const { data, error } = await supabaseAdmin
+    .from('wheel_segments')
+    .select('id, label, amount, probability, is_active')
+    .order('id', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ segments: data || [] });
 }
 
-async function saveWheelConfig(req, res) {
+async function saveWheelSegment(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { fixed_prize_amount } = req.body;
-  const { error } = await supabaseAdmin.from('wheel_config').update({ fixed_prize_amount: Number(fixed_prize_amount) }).eq('id', 1);
+  const { id, label, amount, probability, is_active = true } = req.body || {};
+  const parsedAmount = Number(amount);
+  const parsedProbability = Number(probability);
+  if (!Number.isFinite(parsedAmount) || parsedAmount < 0 || !Number.isFinite(parsedProbability) || parsedProbability < 0) {
+    return res.status(400).json({ error: 'Amount and probability must be valid non-negative numbers' });
+  }
+  const payload = {
+    label: String(label || '').trim() || `₦${parsedAmount.toLocaleString('en-NG')}`,
+    amount: parsedAmount,
+    probability: parsedProbability,
+    is_active: Boolean(is_active),
+    updated_at: new Date().toISOString()
+  };
+  const query = id
+    ? supabaseAdmin.from('wheel_segments').update(payload).eq('id', id)
+    : supabaseAdmin.from('wheel_segments').insert(payload);
+  const { error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ success: true });
+}
+
+async function deleteWheelSegment(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'Segment id is required' });
+  const { error } = await supabaseAdmin.from('wheel_segments').delete().eq('id', id);
   if (error) return res.status(500).json({ error: error.message });
   return res.json({ success: true });
 }
