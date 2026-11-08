@@ -408,9 +408,9 @@
           <td>${d.profiles?.email || 'Unknown'}<br><small>${d.profiles?.full_name || ''}</small></td>
           <td style="font-weight: 700; color: var(--primary);">${formatCurrency(d.amount)}</td>
           <td>${d.sender_name || '-'}</td>
-          <td><span class="status-badge status-${d.status}">${d.status}</span></td>
+          <td><span class="status-badge status-${d.status}">${d.status}</span>${d.payment_method === 'afrstar' ? '<br><small>AfrStar</small>' : ''}</td>
           <td>${new Date(d.created_at).toLocaleDateString()}</td>
-          <td>${d.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="processDep('${d.id}', 'approved')">Approve</button> <button class="btn btn-danger btn-sm" onclick="processDep('${d.id}', 'rejected')">Reject</button>` : '-'}</td>
+          <td>${d.payment_method === 'afrstar' ? d.afrstar?.order_status === 'review' ? `<span class="small muted">Reconciliation required · ${d.afrstar.order_sn}</span>` : d.afrstar?.order_status === 'creating' ? `<span class="small muted">Checkout result uncertain · ${d.afrstar.order_sn}</span>` : `<span class="small muted">${d.afrstar?.order_status === 'paid' ? 'Settled by verified callback' : d.afrstar?.order_status === 'submitted' ? 'Awaiting payment callback' : 'Order setup pending'}${d.afrstar?.order_sn ? ` · ${d.afrstar.order_sn}` : ''}</span>` : d.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="processDep('${d.id}', 'approved')">Approve</button> <button class="btn btn-danger btn-sm" onclick="processDep('${d.id}', 'rejected')">Reject</button>` : '-'}</td>
         </tr>
       `).join('');
     }
@@ -429,8 +429,8 @@
           <td>${w.profiles?.email || 'Unknown'}</td>
           <td style="font-weight: 700;">${formatCurrency(w.amount)}</td>
           <td><small>${w.bank_name}<br>${w.account_number}<br>${w.account_name}</small></td>
-          <td><span class="status-badge status-${w.status}">${w.status}</span></td>
-          <td>${w.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="processWd('${w.id}', 'approved')">Approve</button> <button class="btn btn-danger btn-sm" onclick="processWd('${w.id}', 'rejected')">Reject</button>` : '-'}</td>
+          <td><span class="status-badge status-${w.afrstar?.order_status === 'paid' ? 'approved' : w.afrstar?.order_status === 'review' ? 'rejected' : w.status}">${w.afrstar?.order_status === 'paid' ? 'paid' : w.afrstar?.order_status === 'review' ? 'reconciliation' : w.afrstar?.order_status === 'creating' ? 'submission uncertain' : w.afrstar?.order_status === 'submitted' ? 'awaiting callback' : w.status}</span>${w.afrstar ? `<br><small>AfrStar ${w.afrstar.order_sn}</small>` : ''}</td>
+          <td>${w.afrstar?.order_status === 'creating' ? '<span class="small muted">Do not resubmit; reconcile with AfrStar</span>' : w.afrstar?.order_status === 'submitted' ? '<span class="small muted">Awaiting callback</span>' : w.afrstar?.order_status === 'review' ? '<span class="small muted">Manual reconciliation required</span>' : w.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="processWd('${w.id}', 'approved')">${w.afrstar ? 'Retry setup' : 'Approve'}</button> ${w.afrstar ? '' : `<button class="btn btn-danger btn-sm" onclick="processWd('${w.id}', 'rejected')">Reject</button>`}` : '-'}</td>
         </tr>
       `).join('');
     }
