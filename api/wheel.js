@@ -20,8 +20,14 @@ export default async function handler(req, res) {
 }
 
 async function getConfig(res) {
-  const { data } = await supabaseAdmin.from('wheel_config').select('fixed_prize_amount').eq('id', 1).single();
-  return res.json({ fixed_prize: data?.fixed_prize_amount || 600 });
+  const { data, error } = await supabaseAdmin
+    .from('wheel_segments')
+    .select('id, label, amount, probability')
+    .eq('is_active', true)
+    .gt('probability', 0)
+    .order('id', { ascending: true });
+  if (error) return res.status(500).json({ error: 'Wheel configuration unavailable' });
+  return res.json({ segments: data || [] });
 }
 
 async function getHistory(userId, res) {
