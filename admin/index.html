@@ -48,18 +48,49 @@
     .modal-header { padding: var(--spacing-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .modal-body { padding: clamp(16px, 4vw, 24px); overflow-y: auto; flex: 1; }
     .modal-footer { padding: 16px clamp(16px, 4vw, 24px); border-top: 1px solid rgba(130, 190, 157, .14); background: rgba(0,0,0,.12); }
+    .overview-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; margin-bottom:24px; }
+    .overview-heading h2 { margin:3px 0 5px; }
+    .overview-heading p { margin:0; }
+    .overview-tools { display:flex; align-items:center; gap:12px; }
+    .eyebrow { color:var(--primary, #10b981); font-size:.68rem; font-weight:800; letter-spacing:.14em; }
+    .overview-grid { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+    .metric-card { position:relative; min-height:190px; margin:0; overflow:hidden; }
+    .metric-card::after { content:''; position:absolute; width:130px; height:130px; right:-52px; bottom:-56px; border-radius:50%; background:rgba(16,185,129,.08); }
+    .metric-icon, .queue-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:12px; margin-bottom:20px; }
+    .metric-icon.jade, .queue-icon.jade { color:#6ee7b7; background:rgba(16,185,129,.14); }
+    .metric-icon.gold, .queue-icon.gold { color:#f5d77d; background:rgba(231,200,115,.14); }
+    .metric-icon.rose, .queue-icon.rose { color:#fda4af; background:rgba(244,63,94,.13); }
+    .metric-icon.blue, .queue-icon.blue { color:#93c5fd; background:rgba(59,130,246,.13); }
+    .metric-label { color:var(--text-muted, #91a49a); font-size:.78rem; font-weight:700; }
+    .metric-value { margin-top:6px; font:800 clamp(1.4rem, 3vw, 2rem)/1.1 'Sora', sans-serif; letter-spacing:-.04em; }
+    .gold-text { color:#f5d77d; }.rose-text { color:#fda4af; }
+    .metric-link { position:absolute; z-index:1; left:24px; bottom:20px; border:0; background:none; padding:0; color:var(--primary, #10b981); font-size:.76rem; font-weight:800; cursor:pointer; }
+    .metric-link i { margin-left:5px; transition:transform .2s; }.metric-link:hover i { transform:translateX(3px); }
+    .overview-lower { display:grid; grid-template-columns:minmax(0, 1.35fr) minmax(280px, .85fr); gap:16px; margin-top:16px; }
+    .overview-lower .admin-card { margin:0; }
+    .card-title-row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:7px; }
+    .card-title-row h3, .quick-card h3 { margin:0 0 18px; }
+    .live-dot { color:#6ee7b7; font-size:.63rem; font-weight:800; letter-spacing:.12em; }.live-dot::before { content:''; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:#34d399; box-shadow:0 0 0 4px rgba(52,211,153,.12); }
+    .queue-row { display:grid; grid-template-columns:38px minmax(0,1fr) auto 12px; align-items:center; gap:12px; width:100%; padding:13px 0; border:0; border-top:1px solid rgba(130,190,157,.12); background:none; color:inherit; text-align:left; cursor:pointer; }
+    .queue-row .queue-icon { margin:0; }.queue-row strong, .queue-row small { display:block; }.queue-row strong { font-size:.86rem; }.queue-row small { margin-top:3px; color:var(--text-muted,#91a49a); font-size:.7rem; }.queue-row b { min-width:25px; color:var(--primary,#10b981); text-align:right; }.queue-row > i { color:var(--text-muted,#91a49a); font-size:.7rem; }.queue-row:hover strong { color:var(--primary,#10b981); }
+    .quick-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.quick-actions button { display:flex; align-items:center; gap:10px; min-height:58px; padding:12px; border:1px solid rgba(130,190,157,.14); border-radius:12px; background:rgba(255,255,255,.025); color:var(--fg,#eef7f1); text-align:left; cursor:pointer; font-size:.78rem; font-weight:700; }.quick-actions button i { color:var(--primary,#10b981); }.quick-actions button:hover { border-color:rgba(16,185,129,.5); background:rgba(16,185,129,.07); }
     @media (max-width: 700px) {
       .admin-header { align-items: flex-start; flex-direction: column; }
       .admin-header > div:last-child { width: 100%; justify-content: space-between; }
-      .admin-tabs { top: 105px; }
+      .admin-tabs { top: 105px; flex-wrap:wrap; padding:8px; gap:4px; }
+      .admin-tab { flex:1 0 calc(33.333% - 4px); padding:11px 6px; text-align:center; border:1px solid transparent; border-radius:9px; }
+      .admin-tab.active { border-color:rgba(16,185,129,.4); background:rgba(16,185,129,.1); }
       .admin-content { padding-top: 22px; }
       .admin-card { border-radius: 15px; }
       .admin-table { min-width: 620px; }
       .admin-content > div[style*="grid-template-columns"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      .overview-heading { align-items:flex-start; flex-direction:column; }.overview-tools { width:100%; justify-content:space-between; }
+      .overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }.metric-card { min-height:165px; padding:16px; }.metric-icon { margin-bottom:14px; }.metric-link { left:16px; bottom:16px; }
+      .overview-lower { grid-template-columns:1fr; }.admin-table { min-width:0; font-size:.76rem; }.admin-table th, .admin-table td { padding:10px 7px; font-size:.74rem; }.admin-table th { font-size:.6rem; }
     }
     @media (max-width: 420px) {
       .admin-content > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
-      .admin-tab { padding-inline: 14px; }
+      .admin-tab { font-size:.72rem; }.overview-grid { grid-template-columns:1fr; }.metric-card { min-height:145px; }
     }
   </style>
 </head>
@@ -88,12 +119,16 @@
   <main class="admin-content">
     <!-- DASHBOARD -->
     <div id="dashboard" class="section active">
-      <h2>Platform Overview</h2>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); margin-top: var(--spacing-md);">
-        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Users</h3><div id="stat-users" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800;">0</div></div>
-        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Deposits</h3><div id="stat-deposits" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--primary);">₦0</div></div>
-        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Total Withdrawals</h3><div id="stat-withdrawals" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800; color: var(--gold);">₦0</div></div>
-        <div class="admin-card" style="margin:0;"><h3 style="color: var(--text-muted); font-size: 0.9rem;">Commissions Paid</h3><div id="stat-commissions" style="font-family: 'Sora'; font-size: 2rem; font-weight: 800;">₦0</div></div>
+      <div class="overview-heading"><div><p class="eyebrow">CONTROL CENTER</p><h2>Platform overview</h2><p class="muted">A live snapshot of money movement and work waiting for you.</p></div><div class="overview-tools"><span id="overview-updated" class="small muted">Updating…</span><button class="btn btn-ghost btn-sm" onclick="loadDashboard()"><i class="fa-solid fa-rotate"></i> Refresh</button></div></div>
+      <div class="overview-grid">
+        <div class="admin-card metric-card"><span class="metric-icon jade"><i class="fa-solid fa-users"></i></span><div class="metric-label">Total users</div><div id="stat-users" class="metric-value">—</div><button class="metric-link" onclick="switchTab('users', document.querySelector('.admin-tab:nth-child(4)'))">View users <i class="fa-solid fa-arrow-right"></i></button></div>
+        <div class="admin-card metric-card"><span class="metric-icon gold"><i class="fa-solid fa-arrow-down"></i></span><div class="metric-label">Approved deposits</div><div id="stat-deposits" class="metric-value gold-text">—</div><button class="metric-link" onclick="switchTab('deposits', document.querySelector('.admin-tab:nth-child(2)'))">Open deposits <i class="fa-solid fa-arrow-right"></i></button></div>
+        <div class="admin-card metric-card"><span class="metric-icon rose"><i class="fa-solid fa-arrow-up"></i></span><div class="metric-label">Approved withdrawals</div><div id="stat-withdrawals" class="metric-value rose-text">—</div><button class="metric-link" onclick="switchTab('withdrawals', document.querySelector('.admin-tab:nth-child(3)'))">Open withdrawals <i class="fa-solid fa-arrow-right"></i></button></div>
+        <div class="admin-card metric-card"><span class="metric-icon blue"><i class="fa-solid fa-coins"></i></span><div class="metric-label">Commissions paid</div><div id="stat-commissions" class="metric-value">—</div><span class="small muted">Approved referral commissions</span></div>
+      </div>
+      <div class="overview-lower">
+        <section class="admin-card attention-card"><div class="card-title-row"><div><p class="eyebrow">ACTION QUEUE</p><h3>Needs your attention</h3></div><span class="live-dot">LIVE</span></div><button class="queue-row" onclick="switchTab('deposits', document.querySelector('.admin-tab:nth-child(2)'))"><span class="queue-icon gold"><i class="fa-solid fa-building-columns"></i></span><span><strong>Pending deposits</strong><small>Review and approve incoming funding</small></span><b id="stat-pending-deposits">—</b><i class="fa-solid fa-chevron-right"></i></button><button class="queue-row" onclick="switchTab('withdrawals', document.querySelector('.admin-tab:nth-child(3)'))"><span class="queue-icon rose"><i class="fa-solid fa-money-bill-transfer"></i></span><span><strong>Pending withdrawals</strong><small>Review payout requests</small></span><b id="stat-pending-withdrawals">—</b><i class="fa-solid fa-chevron-right"></i></button><button class="queue-row" onclick="switchTab('support', document.querySelector('.admin-tab:nth-child(8)'))"><span class="queue-icon blue"><i class="fa-solid fa-headset"></i></span><span><strong>Open support tickets</strong><small>Respond to customers waiting for help</small></span><b id="stat-open-tickets">—</b><i class="fa-solid fa-chevron-right"></i></button></section>
+        <section class="admin-card quick-card"><p class="eyebrow">SHORTCUTS</p><h3>Quick actions</h3><div class="quick-actions"><button onclick="switchTab('products', document.querySelector('.admin-tab:nth-child(5)'))"><i class="fa-solid fa-plus"></i><span>Add product</span></button><button onclick="switchTab('wheel', document.querySelector('.admin-tab:nth-child(6)'))"><i class="fa-solid fa-dharmachakra"></i><span>Configure wheel</span></button><button onclick="switchTab('users', document.querySelector('.admin-tab:nth-child(4)'))"><i class="fa-solid fa-user-gear"></i><span>Manage users</span></button><button onclick="switchTab('settings', document.querySelector('.admin-tab:nth-child(9)'))"><i class="fa-solid fa-sliders"></i><span>Site settings</span></button></div></section>
       </div>
     </div>
 
@@ -276,13 +311,13 @@
         <label class="form-label">Price<input id="product-price" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
         <label class="form-label">Profit<input id="product-profit" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
         <label class="form-label">Duration (days)<input id="product-duration" type="number" min="1" value="1" class="input input-sm"></label>
-        <label class="form-label">Payout type<input id="product-payout" class="input input-sm" value="fixed"></label>
+        <label class="form-label">Payout type<select id="product-payout" class="input input-sm"><option value="daily">Daily</option><option value="lump_sum">Lump sum</option></select></label>
         <label class="form-label">Max capacity (Limited)<input id="product-capacity" type="number" min="0" class="input input-sm"></label>
         <label><input id="product-active" type="checkbox" checked> Active</label>
         <label><input id="product-coming" type="checkbox"> Coming soon</label>
         <label class="form-label">Sort order<input id="product-sort" type="number" class="input input-sm" value="0"></label>
       </div>
-      <div class="modal-footer"><button class="btn btn-primary btn-block" onclick="saveProductForm()">Save product</button></div>
+      <div class="modal-footer"><div id="product-form-error" class="small" style="color:var(--danger);margin-bottom:10px;min-height:1em;"></div><button class="btn btn-primary btn-block" onclick="saveProductForm()">Save product</button></div>
     </div>
   </div>
 
@@ -357,6 +392,10 @@
       document.getElementById('stat-deposits').textContent = formatCurrency(data.total_deposits);
       document.getElementById('stat-withdrawals').textContent = formatCurrency(data.total_withdrawals);
       document.getElementById('stat-commissions').textContent = formatCurrency(data.total_commissions);
+      document.getElementById('stat-pending-deposits').textContent = data.pending_deposits ?? 0;
+      document.getElementById('stat-pending-withdrawals').textContent = data.pending_withdrawals ?? 0;
+      document.getElementById('stat-open-tickets').textContent = data.open_tickets ?? 0;
+      document.getElementById('overview-updated').textContent = `Updated ${new Date(data.updated_at || Date.now()).toLocaleTimeString()}`;
     }
 
     // Deposits
@@ -443,11 +482,12 @@
       document.getElementById('product-price').value = product.id ? (product.price ?? 0) : 0;
       document.getElementById('product-profit').value = product.id ? (product.profit ?? 0) : 0;
       document.getElementById('product-duration').value = product.id ? (product.duration_days ?? 1) : 1;
-      document.getElementById('product-payout').value = product.payout_type || 'fixed';
+      document.getElementById('product-payout').value = product.payout_type || 'daily';
       document.getElementById('product-capacity').value = product.max_capacity ?? '';
       document.getElementById('product-active').checked = product.is_active !== false;
       document.getElementById('product-coming').checked = Boolean(product.is_coming_soon);
       document.getElementById('product-sort').value = product.sort_order ?? 0;
+      document.getElementById('product-form-error').textContent = '';
       document.getElementById('product-modal').classList.add('active');
     };
     window.editProduct = (product) => window.openProductModal(product);
@@ -467,9 +507,13 @@
         sort_order: document.getElementById('product-sort').value
       };
       if (!payload.name) return showAdminStatus('Product name is required', true);
-      await apiCall('saveProduct', 'POST', payload);
-      closeProductModal();
-      loadProducts();
+      try {
+        await apiCall('saveProduct', 'POST', payload);
+        closeProductModal();
+        loadProducts();
+      } catch (error) {
+        document.getElementById('product-form-error').textContent = error.message || 'Could not save package';
+      }
     };
 
     window.adjustUserBalance = async (id, email) => {
