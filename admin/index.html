@@ -42,21 +42,22 @@
   <header class="admin-header">
     <div style="font-family: 'Sora'; font-weight: 800; font-size: 1.5rem; color: var(--primary);">LCG ADMIN</div>
     <div style="display: flex; gap: 10px; align-items: center;">
+      <span id="admin-status" style="font-size: 0.85rem;"></span>
       <span id="admin-email" style="color: var(--text-muted); font-size: 0.9rem;">Loading...</span>
       <button class="btn btn-danger btn-sm" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
     </div>
   </header>
 
   <nav class="admin-tabs">
-    <div class="admin-tab active" onclick="switchTab('dashboard')">Dashboard</div>
-    <div class="admin-tab" onclick="switchTab('deposits')">Deposits</div>
-    <div class="admin-tab" onclick="switchTab('withdrawals')">Withdrawals</div>
-    <div class="admin-tab" onclick="switchTab('users')">Users</div>
-    <div class="admin-tab" onclick="switchTab('products')">Products</div>
-    <div class="admin-tab" onclick="switchTab('wheel')">Wheel</div>
-    <div class="admin-tab" onclick="switchTab('special-vips')">Special VIPs</div>
-    <div class="admin-tab" onclick="switchTab('support')">Support</div>
-    <div class="admin-tab" onclick="switchTab('settings')">Settings</div>
+    <div class="admin-tab active" onclick="switchTab('dashboard', event)">Dashboard</div>
+    <div class="admin-tab" onclick="switchTab('deposits', event)">Deposits</div>
+    <div class="admin-tab" onclick="switchTab('withdrawals', event)">Withdrawals</div>
+    <div class="admin-tab" onclick="switchTab('users', event)">Users</div>
+    <div class="admin-tab" onclick="switchTab('products', event)">Products</div>
+    <div class="admin-tab" onclick="switchTab('wheel', event)">Wheel</div>
+    <div class="admin-tab" onclick="switchTab('special-vips', event)">Special VIPs</div>
+    <div class="admin-tab" onclick="switchTab('support', event)">Support</div>
+    <div class="admin-tab" onclick="switchTab('settings', event)">Settings</div>
   </nav>
 
   <main class="admin-content">
@@ -139,12 +140,13 @@
     <!-- WHEEL -->
     <div id="wheel" class="section">
       <h2>Lucky Wheel Config</h2>
-      <div class="admin-card">
-        <label class="form-label">Fixed Winning Amount (₦)</label>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <input type="number" id="wheel-prize" class="input input-sm" style="width: 200px;">
-          <button class="btn btn-primary btn-sm" onclick="saveWheel()">Save Config</button>
-        </div>
+      <div class="admin-card" style="overflow-x: auto;">
+        <p class="muted small">Add reward segments. Probability is a relative weight: a segment with weight 2 is twice as likely as one with weight 1.</p>
+        <table class="admin-table" id="segment-table">
+          <thead><tr><th>Label</th><th>Amount (₦)</th><th>Weight</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="btn btn-primary btn-sm" style="margin-top: 15px;" onclick="addWheelSegment()">Add Segment</button>
       </div>
       <h3 style="margin-top: 30px;">Recent Spins</h3>
       <div class="admin-card" style="overflow-x: auto;">
@@ -238,6 +240,27 @@
     </div>
   </div>
 
+  <!-- Product editor -->
+  <div id="product-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header"><h3 id="product-modal-title">Add Product</h3><button class="btn btn-ghost btn-sm" onclick="closeProductModal()"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body" style="display:grid;gap:12px;">
+        <input type="hidden" id="product-id">
+        <label class="form-label">Name<input id="product-name" class="input input-sm" required></label>
+        <label class="form-label">Category<select id="product-category" class="input input-sm"><option>Regular</option><option>Limited</option></select></label>
+        <label class="form-label">Price<input id="product-price" type="number" min="0" step="0.01" class="input input-sm"></label>
+        <label class="form-label">Profit<input id="product-profit" type="number" min="0" step="0.01" class="input input-sm"></label>
+        <label class="form-label">Duration (days)<input id="product-duration" type="number" min="1" class="input input-sm"></label>
+        <label class="form-label">Payout type<input id="product-payout" class="input input-sm" value="fixed"></label>
+        <label class="form-label">Max capacity (Limited)<input id="product-capacity" type="number" min="0" class="input input-sm"></label>
+        <label><input id="product-active" type="checkbox" checked> Active</label>
+        <label><input id="product-coming" type="checkbox"> Coming soon</label>
+        <label class="form-label">Sort order<input id="product-sort" type="number" class="input input-sm" value="0"></label>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary btn-block" onclick="saveProductForm()">Save product</button></div>
+    </div>
+  </div>
+
   <script type="module">
     import { requireAdmin } from '/assets/js/auth-guard.js';
     import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
@@ -251,6 +274,15 @@
       loadDashboard();
     }
 
+    const showAdminStatus = (message, isError = false) => {
+      const target = document.getElementById('admin-status');
+      if (!target) return;
+      target.textContent = message;
+      target.style.color = isError ? 'var(--danger)' : 'var(--success)';
+      clearTimeout(showAdminStatus.timer);
+      showAdminStatus.timer = setTimeout(() => { target.textContent = ''; }, 3500);
+    };
+
     const apiCall = async (action, method = 'GET', body = null) => {
       const opts = {
         method,
@@ -261,16 +293,27 @@
         opts.body = JSON.stringify(body);
       }
       const res = await fetch(`/api/admin?action=${action}`, opts);
-      return await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        const message = data.error || `Admin request failed (${res.status})`;
+        showAdminStatus(message, true);
+        throw new Error(message);
+      }
+      showAdminStatus('Saved');
+      return data;
     };
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[char]));
 
     let currentModalTicketId = null;
 
-    window.switchTab = (tabId) => {
+    window.switchTab = (tabId, clickEvent) => {
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      clickEvent?.currentTarget?.classList.add('active');
       
       if (tabId === 'deposits') loadDeposits();
       if (tabId === 'withdrawals') loadWithdrawals();
@@ -342,7 +385,7 @@
           <td>${u.full_name || '-'}</td>
           <td style="font-weight: 700; color: var(--primary);">${formatCurrency(u.wallets?.[0]?.balance || 0)}</td>
           <td>${u.is_frozen ? '<span class="status-badge status-rejected">Frozen</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
-          <td><button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button> <button class="btn btn-sm btn-primary" onclick="adjustUserBalance('${u.id}', '${escapeHtml(u.email || '')}')">Balance</button></td>
         </tr>
       `).join('');
     }
@@ -358,7 +401,7 @@
         <tr>
           <td>${p.name}</td><td>${p.category}</td><td>${formatCurrency(p.price)}</td><td>${formatCurrency(p.profit)}</td><td>${p.duration_days} days</td>
           <td>${p.is_coming_soon ? '<span class="status-badge status-pending">Coming Soon</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
-          <td><button class="btn btn-danger btn-sm" onclick="deleteProd('${p.id}')">Delete</button></td>
+          <td><button class="btn btn-secondary btn-sm" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'>Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteProd('${p.id}')">Delete</button></td>
         </tr>
       `).join('');
     }
@@ -367,20 +410,89 @@
       await apiCall('deleteProduct', 'POST', { id });
       loadProducts();
     };
-    window.openProductModal = () => alert('Use Supabase table editor to add products for now.');
+    window.openProductModal = (product = {}) => {
+      document.getElementById('product-modal-title').textContent = product.id ? 'Edit Product' : 'Add Product';
+      document.getElementById('product-id').value = product.id || '';
+      document.getElementById('product-name').value = product.name || '';
+      document.getElementById('product-category').value = product.category || 'Regular';
+      document.getElementById('product-price').value = product.price ?? '';
+      document.getElementById('product-profit').value = product.profit ?? '';
+      document.getElementById('product-duration').value = product.duration_days ?? '';
+      document.getElementById('product-payout').value = product.payout_type || 'fixed';
+      document.getElementById('product-capacity').value = product.max_capacity ?? '';
+      document.getElementById('product-active').checked = product.is_active !== false;
+      document.getElementById('product-coming').checked = Boolean(product.is_coming_soon);
+      document.getElementById('product-sort').value = product.sort_order ?? 0;
+      document.getElementById('product-modal').classList.add('active');
+    };
+    window.editProduct = (product) => window.openProductModal(product);
+    window.closeProductModal = () => document.getElementById('product-modal').classList.remove('active');
+    window.saveProductForm = async () => {
+      const payload = {
+        id: document.getElementById('product-id').value || undefined,
+        name: document.getElementById('product-name').value.trim(),
+        category: document.getElementById('product-category').value,
+        price: document.getElementById('product-price').value,
+        profit: document.getElementById('product-profit').value,
+        duration_days: document.getElementById('product-duration').value,
+        payout_type: document.getElementById('product-payout').value.trim(),
+        max_capacity: document.getElementById('product-capacity').value,
+        is_active: document.getElementById('product-active').checked,
+        is_coming_soon: document.getElementById('product-coming').checked,
+        sort_order: document.getElementById('product-sort').value
+      };
+      if (!payload.name) return showAdminStatus('Product name is required', true);
+      await apiCall('saveProduct', 'POST', payload);
+      closeProductModal();
+      loadProducts();
+    };
+
+    window.adjustUserBalance = async (id, email) => {
+      const type = (prompt(`Balance action for ${email}: enter credit or debit`) || '').trim().toLowerCase();
+      if (!['credit', 'debit'].includes(type)) return;
+      const amount = prompt('Amount:');
+      const reason = prompt('Reason:') || 'Admin adjustment';
+      if (!amount) return;
+      await apiCall('adjustBalance', 'POST', { user_id: id, type, amount, reason });
+      loadUsers();
+      loadDashboard();
+    };
 
     // Wheel
     async function loadWheel() {
       const config = await apiCall('getWheelConfig');
-      document.getElementById('wheel-prize').value = config.config?.fixed_prize_amount || 600;
+      document.querySelector('#segment-table tbody').innerHTML = (config.segments || []).map(s => `
+        <tr>
+          <td><input type="text" id="segment-label-${s.id}" value="${escapeHtml(s.label || '')}" class="input input-sm" style="width: 130px;"></td>
+          <td><input type="number" min="0" step="0.01" id="segment-amount-${s.id}" value="${s.amount}" class="input input-sm" style="width: 110px;"></td>
+          <td><input type="number" min="0" step="0.01" id="segment-probability-${s.id}" value="${s.probability}" class="input input-sm" style="width: 90px;"></td>
+          <td><input type="checkbox" id="segment-active-${s.id}" ${s.is_active ? 'checked' : ''}></td>
+          <td><button class="btn btn-primary btn-sm" onclick="saveWheelSegment(${s.id})">Save</button> <button class="btn btn-danger btn-sm" onclick="deleteWheelSegment(${s.id})">Delete</button></td>
+        </tr>
+      `).join('');
       const spins = await apiCall('getSpins');
       document.querySelector('#spin-table tbody').innerHTML = spins.spins.map(s => `
         <tr><td>${s.profiles?.email || 'Unknown'}</td><td style="font-weight: 700; color: var(--gold);">${formatCurrency(s.amount_won)}</td><td>${s.trigger_type}</td><td>${new Date(s.created_at).toLocaleDateString()}</td></tr>
       `).join('');
     }
-    window.saveWheel = async () => {
-      await apiCall('saveWheelConfig', 'POST', { fixed_prize_amount: document.getElementById('wheel-prize').value });
-      alert('Wheel config saved!');
+    window.saveWheelSegment = async (id) => {
+      await apiCall('saveWheelSegment', 'POST', {
+        id,
+        label: document.getElementById(`segment-label-${id}`).value,
+        amount: document.getElementById(`segment-amount-${id}`).value,
+        probability: document.getElementById(`segment-probability-${id}`).value,
+        is_active: document.getElementById(`segment-active-${id}`).checked
+      });
+      loadWheel();
+    };
+    window.addWheelSegment = async () => {
+      await apiCall('saveWheelSegment', 'POST', { label: 'New reward', amount: 100, probability: 1, is_active: true });
+      loadWheel();
+    };
+    window.deleteWheelSegment = async (id) => {
+      if (!confirm('Delete this wheel segment?')) return;
+      await apiCall('deleteWheelSegment', 'POST', { id });
+      loadWheel();
     };
 
     // Special VIPs
@@ -457,15 +569,16 @@
     };
 
     window.markResolved = async () => {
-      // Simple way to mark resolved: update ticket status directly via a quick fetch or add an endpoint. 
-      // For now, we'll just close the modal. (You can add a 'resolveTicket' action to admin.js if needed).
-      alert('To mark as resolved, update the status in the Supabase table editor or add a resolve endpoint.');
+      if (!currentModalTicketId) return;
+      await apiCall('resolveTicket', 'POST', { ticket_id: currentModalTicketId });
+      closeModal();
+      loadTickets();
     };
 
     // Settings
     async function loadSettings() {
-      const { data } = await supabase.from('site_settings').select('key, value');
-      const map = {}; data.forEach(s => map[s.key] = s.value);
+      const result = await apiCall('getSettings');
+      const map = {}; (result.settings || []).forEach(s => map[s.key] = s.value);
       document.getElementById('set-comm-pct').value = map['referral_commission_percentage'] || 10;
       document.getElementById('set-wd-fee').value = map['withdrawal_fee_percentage'] || 0;
       document.getElementById('set-min-dep').value = map['min_deposit'] || 1000;
