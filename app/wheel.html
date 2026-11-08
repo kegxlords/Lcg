@@ -34,11 +34,12 @@ const { icons, topbarHTML, bottomNavHTML, toast } = window.LCGUI;
 const mainShell = `
   <header class="topbar"><a href="dashboard.html" class="brand"><span class="logo-dot">L</span><span>LCG</span></a><span class="badge gold">${icons.wheel} Lucky wheel</span></header>
   <main class="page page-enter">
-    <div class="page-head"><h1>Lucky wheel</h1><p>View the configured reward and your claimed spin history.</p></div>
+    <div class="page-head"><h1>Lucky wheel</h1><p>Spin for a randomly selected reward and view your claimed spin history.</p></div>
     <section class="card wheel-hero" aria-labelledby="reward-heading">
-      <div class="reward-disc" id="reward-disc" aria-hidden="true"><div class="reward-label">${icons.gift}<span class="small muted">Configured fixed reward</span><strong class="reward-amount" id="reward-amount">—</strong></div></div>
-      <h2 id="reward-heading" style="font:600 17px var(--f-display);">Fixed reward</h2>
-      <p class="small muted" style="margin:5px auto 18px;max-width:340px;">The reward amount shown is the amount configured by the service. Spin availability is confirmed by the server when you choose to spin.</p>
+      <div class="reward-disc" id="reward-disc" aria-hidden="true"><div class="reward-label">${icons.gift}<span class="small muted">Random reward segments</span><strong class="reward-amount" id="reward-amount">—</strong></div></div>
+      <h2 id="reward-heading" style="font:600 17px var(--f-display);">Random reward</h2>
+      <p class="small muted" style="margin:5px auto 18px;max-width:340px;">The server securely selects one active reward segment using its configured probability weight.</p>
+      <div id="segment-list" class="small muted" style="margin-bottom:18px;"></div>
       <button class="btn btn-jade btn-block wheel-button" id="spin-button" type="button">${icons.wheel} Spin</button>
       <div id="spin-result" aria-live="polite" style="margin-top:14px;"></div>
     </section>
@@ -51,7 +52,7 @@ const mainShell = `
   ${bottomNavHTML('home')}`;
 
 app.innerHTML = mainShell;
-let rewardAmount = null;
+let rewardSegments = [];
 let busy = false;
 
 function renderHistory(rows) {
@@ -74,10 +75,13 @@ async function loadPage() {
       apiRequest('/api/wheel?action=getConfig'),
       apiRequest('/api/wheel?action=getHistory')
     ]);
-    rewardAmount = config.fixed_prize === null || config.fixed_prize === undefined || config.fixed_prize === '' ? NaN : Number(config.fixed_prize);
-    document.getElementById('reward-amount').textContent = Number.isFinite(rewardAmount) ? money(rewardAmount) : 'Not configured';
+    rewardSegments = Array.isArray(config.segments) ? config.segments : [];
+    document.getElementById('reward-amount').textContent = rewardSegments.length ? `${rewardSegments.length} options` : 'Not configured';
+    document.getElementById('segment-list').textContent = rewardSegments.length
+      ? rewardSegments.map((segment) => `${escapeHTML(segment.label || money(segment.amount))} (${escapeHTML(money(segment.amount))})`).join(' • ')
+      : 'No active rewards configured.';
     renderHistory(history.history);
-    document.getElementById('spin-button').disabled = !Number.isFinite(rewardAmount) || rewardAmount < 0;
+    document.getElementById('spin-button').disabled = rewardSegments.length === 0;
     app.dataset.liveReady = 'true';
   } catch (error) {
     showPageError(errorTarget,error,loadPage);
@@ -87,7 +91,7 @@ async function loadPage() {
 }
 
 async function spin() {
-  if (busy || !Number.isFinite(rewardAmount)) return;
+  if (busy || rewardSegments.length === 0) return;
   busy = true;
   const button = document.getElementById('spin-button');
   const disc = document.getElementById('reward-disc');
