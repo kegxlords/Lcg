@@ -307,7 +307,7 @@
       <div class="modal-body" style="display:grid;gap:12px;">
         <input type="hidden" id="product-id">
         <label class="form-label">Name<input id="product-name" class="input input-sm" required></label>
-        <label class="form-label">Category<select id="product-category" class="input input-sm"><option>Regular</option><option>Limited</option></select></label>
+        <label class="form-label">Category<select id="product-category" class="input input-sm" required><option value="General">General</option><option value="Welfare">Welfare</option><option value="Limited">Limited</option></select></label>
         <label class="form-label">Price<input id="product-price" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
         <label class="form-label">Profit<input id="product-profit" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
         <label class="form-label">Duration (days)<input id="product-duration" type="number" min="1" value="1" class="input input-sm"></label>
@@ -478,7 +478,7 @@
       document.getElementById('product-modal-title').textContent = product.id ? 'Edit Product' : 'Add Product';
       document.getElementById('product-id').value = product.id || '';
       document.getElementById('product-name').value = product.name || '';
-      document.getElementById('product-category').value = product.category || 'Regular';
+      document.getElementById('product-category').value = product.category || 'General';
       document.getElementById('product-price').value = product.id ? (product.price ?? 0) : 0;
       document.getElementById('product-profit').value = product.id ? (product.profit ?? 0) : 0;
       document.getElementById('product-duration').value = product.id ? (product.duration_days ?? 1) : 1;
