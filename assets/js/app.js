@@ -111,7 +111,7 @@ function bottomNavHTML(active) {
   const items = [
     { key: 'home', label: 'Home', icon: I.home, href: 'dashboard.html' },
     { key: 'plans', label: 'Plans', icon: I.plans, href: 'products.html' },
-    { key: 'orders', label: 'Orders', icon: I.orders, href: 'investments.html' },
+    { key: 'wheel', label: 'Wheel', icon: I.wheel, href: 'wheel.html' },
     { key: 'team', label: 'Team', icon: I.team, href: 'team.html' },
     { key: 'me', label: 'My', icon: I.me, href: 'profile.html' },
   ];
