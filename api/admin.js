@@ -256,15 +256,15 @@ async function saveProduct(req, res) {
   const parsedProfit = Number(profit);
   const parsedDuration = Number(duration_days);
   const parsedSort = Number(sort_order ?? 0);
-  if (!String(name || '').trim() || !['Regular', 'Limited'].includes(category) || !['daily', 'lump_sum'].includes(payout_type) || !Number.isFinite(parsedPrice) || parsedPrice < 0 || !Number.isFinite(parsedProfit) || parsedProfit < 0 || !Number.isInteger(parsedDuration) || parsedDuration < 1 || !Number.isFinite(parsedSort)) {
+  if (!String(name || '').trim() || !['General', 'Welfare', 'Limited'].includes(category) || !['daily', 'lump_sum'].includes(payout_type) || !Number.isFinite(parsedPrice) || parsedPrice < 0 || !Number.isFinite(parsedProfit) || parsedProfit < 0 || !Number.isInteger(parsedDuration) || parsedDuration < 1 || !Number.isFinite(parsedSort)) {
     return res.status(400).json({ error: 'Name, category, payout type, non-negative price/profit, and duration of at least 1 day are required' });
   }
-  if (category === 'Limited' && (!Number.isInteger(Number(max_capacity)) || Number(max_capacity) < 1)) {
+  if (String(category).trim().toLowerCase() === 'limited' && (!Number.isInteger(Number(max_capacity)) || Number(max_capacity) < 1)) {
     return res.status(400).json({ error: 'Limited products require a max capacity of at least 1' });
   }
 
   const productData = { 
-    name: String(name).trim(), category,
+    name: String(name).trim(), category: String(category).trim(),
     price: parsedPrice,
     profit: parsedProfit,
     duration_days: parsedDuration,
@@ -272,7 +272,7 @@ async function saveProduct(req, res) {
     is_active: is_active !== false,
     is_coming_soon: Boolean(is_coming_soon),
     sort_order: parsedSort,
-    max_capacity: category === 'Limited' ? Number(max_capacity) : null
+    max_capacity: String(category).trim().toLowerCase() === 'limited' ? Number(max_capacity) : null
   };
 
   let error;
