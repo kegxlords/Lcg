@@ -49,8 +49,10 @@ export default async function handler(req, res) {
       case 'getTickets': return await getTickets(req, res);
       case 'getTicketMessages': return await getTicketMessages(req, res);
       case 'replyToTicket': return await replyToTicket(req, res);
+      case 'resolveTicket': return await resolveTicket(req, res);
       
       // Settings
+      case 'getSettings': return await getSettings(res);
       case 'saveSettings': return await saveSettings(req, res);
       
       default: return res.status(400).json({ error: 'Invalid action' });
@@ -101,19 +103,24 @@ async function getDeposits(req, res) {
 async function processDeposit(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { deposit_id, action: status } = req.body;
+  if (!deposit_id || !['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'Invalid deposit action' });
 
   const { data: deposit, error: depError } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
   if (depError || !deposit) return res.status(404).json({ error: 'Deposit not found' });
   if (deposit.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
-  await supabaseAdmin.from('deposits').update({ status }).eq('id', deposit_id);
-  await supabaseAdmin.from('transactions').update({ status }).eq('reference', `DEP_${deposit_id.slice(0, 8).toUpperCase()}`);
+  const { error: updateError } = await supabaseAdmin.from('deposits').update({ status }).eq('id', deposit_id);
+  if (updateError) return res.status(500).json({ error: updateError.message });
+  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).eq('reference', `DEP_${deposit_id.slice(0, 8).toUpperCase()}`);
+  if (transactionError) return res.status(500).json({ error: transactionError.message });
 
   if (status === 'approved') {
     // 1. Credit User Wallet
-    const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', deposit.user_id).single();
+    const { data: wallet, error: walletError } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', deposit.user_id).single();
+    if (walletError || !wallet) return res.status(500).json({ error: walletError?.message || 'Wallet not found' });
     const newBalance = Number(wallet?.balance || 0) + Number(deposit.amount);
-    await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', deposit.user_id);
+    const { error: balanceError } = await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', deposit.user_id);
+    if (balanceError) return res.status(500).json({ error: balanceError.message });
 
     // 2. Trigger Referral Rewards (Commission + Spin + Stats + Special VIP Check)
     await processDepositRewards(deposit.amount, deposit.user_id);
@@ -139,19 +146,24 @@ async function getWithdrawals(req, res) {
 async function processWithdrawal(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { withdrawal_id, action: status } = req.body;
+  if (!withdrawal_id || !['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'Invalid withdrawal action' });
 
   const { data: withdrawal, error: wdError } = await supabaseAdmin.from('withdrawals').select('*').eq('id', withdrawal_id).single();
   if (wdError || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
   if (withdrawal.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
-  await supabaseAdmin.from('withdrawals').update({ status }).eq('id', withdrawal_id);
-  await supabaseAdmin.from('transactions').update({ status }).eq('reference', `WD_${withdrawal_id.slice(0, 8).toUpperCase()}`);
+  const { error: updateError } = await supabaseAdmin.from('withdrawals').update({ status }).eq('id', withdrawal_id);
+  if (updateError) return res.status(500).json({ error: updateError.message });
+  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).eq('reference', `WD_${withdrawal_id.slice(0, 8).toUpperCase()}`);
+  if (transactionError) return res.status(500).json({ error: transactionError.message });
 
   if (status === 'rejected') {
     // Refund balance to user
-    const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', withdrawal.user_id).single();
+    const { data: wallet, error: walletError } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', withdrawal.user_id).single();
+    if (walletError || !wallet) return res.status(500).json({ error: walletError?.message || 'Wallet not found' });
     const newBalance = Number(wallet?.balance || 0) + Number(withdrawal.amount);
-    await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', withdrawal.user_id);
+    const { error: balanceError } = await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', withdrawal.user_id);
+    if (balanceError) return res.status(500).json({ error: balanceError.message });
   }
 
   return res.json({ success: true });
@@ -184,19 +196,27 @@ async function updateUser(req, res) {
 async function adjustBalance(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { user_id, amount, type, reason } = req.body;
+  const parsedAmount = Number(amount);
+  if (!user_id || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !['credit', 'debit'].includes(type)) {
+    return res.status(400).json({ error: 'User, positive amount, and credit/debit type are required' });
+  }
 
-  const { data: wallet } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
+  const { data: wallet, error: walletError } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
+  if (walletError || !wallet) return res.status(404).json({ error: walletError?.message || 'Wallet not found' });
   let newBalance = Number(wallet?.balance || 0);
   
-  if (type === 'credit') newBalance += Number(amount);
-  else if (type === 'debit') newBalance -= Number(amount);
+  if (type === 'credit') newBalance += parsedAmount;
+  else newBalance -= parsedAmount;
+  if (newBalance < 0) return res.status(400).json({ error: 'Debit exceeds wallet balance' });
 
-  await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', user_id);
+  const { error: balanceError } = await supabaseAdmin.from('wallets').update({ balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', user_id);
+  if (balanceError) return res.status(500).json({ error: balanceError.message });
   
-  await supabaseAdmin.from('transactions').insert({
-    user_id, type: `admin_${type}`, amount: Number(amount), status: 'approved',
+  const { error: transactionError } = await supabaseAdmin.from('transactions').insert({
+    user_id, type: `admin_${type}`, amount: parsedAmount, status: 'approved',
     reference: `ADMIN_${Date.now()}`, description: `Admin ${type}: ${reason}`
   });
+  if (transactionError) return res.status(500).json({ error: transactionError.message });
 
   return res.json({ success: true, new_balance: newBalance });
 }
@@ -205,7 +225,8 @@ async function adjustBalance(req, res) {
 // PRODUCTS
 // ==========================================
 async function getProducts(res) {
-  const { data } = await supabaseAdmin.from('products').select('*').order('sort_order', { ascending: true });
+  const { data, error } = await supabaseAdmin.from('products').select('*').order('sort_order', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
   return res.json({ products: data || [] });
 }
 
@@ -358,25 +379,46 @@ async function getTicketMessages(req, res) {
 async function replyToTicket(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   const { ticket_id, message } = req.body;
+  if (!ticket_id || !String(message || '').trim()) return res.status(400).json({ error: 'Ticket and message are required' });
 
-  await supabaseAdmin.from('support_messages').insert({
-    ticket_id, sender_type: 'admin', message
+  const { error: messageError } = await supabaseAdmin.from('support_messages').insert({
+    ticket_id, sender_type: 'admin', message: String(message).trim()
   });
+  if (messageError) return res.status(500).json({ error: messageError.message });
 
-  await supabaseAdmin.from('support_tickets').update({ status: 'open' }).eq('id', ticket_id);
+  const { error: ticketError } = await supabaseAdmin.from('support_tickets').update({ status: 'open' }).eq('id', ticket_id);
+  if (ticketError) return res.status(500).json({ error: ticketError.message });
 
+  return res.json({ success: true });
+}
+
+async function resolveTicket(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  const { ticket_id } = req.body || {};
+  if (!ticket_id) return res.status(400).json({ error: 'Ticket ID required' });
+  const { error } = await supabaseAdmin.from('support_tickets').update({ status: 'resolved' }).eq('id', ticket_id);
+  if (error) return res.status(500).json({ error: error.message });
   return res.json({ success: true });
 }
 
 // ==========================================
 // SETTINGS
 // ==========================================
+async function getSettings(res) {
+  const { data, error } = await supabaseAdmin.from('site_settings').select('key, value');
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json({ settings: data || [] });
+}
+
 async function saveSettings(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { settings } = req.body; // Array of { key, value }
+  const { settings } = req.body || {}; // Array of { key, value }
+  if (!Array.isArray(settings)) return res.status(400).json({ error: 'Settings must be an array' });
 
   for (const item of settings) {
-    await supabaseAdmin.from('site_settings').upsert({ key: item.key, value: String(item.value) }, { onConflict: 'key' });
+    if (!item?.key) return res.status(400).json({ error: 'Each setting needs a key' });
+    const { error } = await supabaseAdmin.from('site_settings').upsert({ key: item.key, value: String(item.value ?? '') }, { onConflict: 'key' });
+    if (error) return res.status(500).json({ error: error.message });
   }
 
   return res.json({ success: true });
