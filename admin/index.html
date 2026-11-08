@@ -9,33 +9,58 @@
   <link rel="stylesheet" href="../assets/css/chat.css">
   <style>
     /* Admin Specific Styles */
-    body { padding-bottom: 0; }
-    .admin-header { background: var(--surface); padding: var(--spacing-md) var(--spacing-lg); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-    .admin-tabs { display: flex; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 var(--spacing-md); }
-    .admin-tab { padding: 15px 20px; color: var(--text-muted); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
-    .admin-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
-    .admin-content { padding: var(--spacing-lg); max-width: 1200px; margin: 0 auto; }
+    body { padding-bottom: 0; background: #070b0a; color: var(--fg, #eef7f1); }
+    .admin-header { position: sticky; top: 0; z-index: 50; background: rgba(11, 18, 15, .94); backdrop-filter: blur(16px); padding: 16px clamp(16px, 4vw, 42px); display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 1px solid rgba(130, 190, 157, .16); box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+    .admin-header > div:first-child { letter-spacing: .08em; font-size: clamp(1.05rem, 3vw, 1.45rem) !important; }
+    .admin-tabs { position: sticky; top: 73px; z-index: 40; display: flex; overflow-x: auto; scrollbar-width: thin; background: rgba(7, 11, 10, .96); border-bottom: 1px solid rgba(130, 190, 157, .14); padding: 0 clamp(8px, 3vw, 30px); }
+    .admin-tab { position: relative; padding: 15px 18px; color: var(--text-muted, #91a49a); font-size: .86rem; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color .2s, background .2s; }
+    .admin-tab:hover { color: var(--fg, #eef7f1); background: rgba(255,255,255,.035); }
+    .admin-tab.active { color: var(--primary, #10b981); border-bottom-color: var(--primary, #10b981); }
+    .admin-content { padding: clamp(20px, 4vw, 38px) clamp(14px, 4vw, 42px); max-width: 1320px; margin: 0 auto; }
+    .admin-content h2 { margin: 0 0 18px; font-size: clamp(1.35rem, 3vw, 1.85rem); letter-spacing: -.02em; }
+    .admin-content h3 { color: var(--fg, #eef7f1); }
     .section { display: none; }
     .section.active { display: block; animation: fadeIn 0.3s ease; }
     
-    .admin-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-lg); }
-    .admin-table { width: 100%; border-collapse: collapse; margin-top: var(--spacing-md); }
-    .admin-table th, .admin-table td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-    .admin-table th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+    .admin-card { background: linear-gradient(145deg, rgba(24, 39, 31, .9), rgba(13, 23, 18, .9)); border: 1px solid rgba(130, 190, 157, .16); border-radius: 18px; padding: clamp(15px, 3vw, 24px); margin-bottom: 20px; box-shadow: 0 12px 30px rgba(0,0,0,.14); }
+    .admin-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 14px; min-width: 680px; }
+    .admin-table th, .admin-table td { padding: 13px 12px; text-align: left; border-bottom: 1px solid rgba(130, 190, 157, .12); font-size: .88rem; vertical-align: middle; }
+    .admin-table th { color: var(--text-muted, #91a49a); font-weight: 800; font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,0,0,.12); }
+    .admin-table th:first-child { border-radius: 10px 0 0 10px; }
+    .admin-table th:last-child { border-radius: 0 10px 10px 0; }
+    .admin-table tbody tr { transition: background .18s; }
+    .admin-table tbody tr:hover { background: rgba(16, 185, 129, .055); }
     
-    .input-sm { padding: 8px; font-size: 0.9rem; }
+    .input-sm { padding: 9px 10px; font-size: .88rem; border-color: rgba(130, 190, 157, .2); background: rgba(0,0,0,.18); }
+    .input-sm:focus { border-color: var(--primary, #10b981); box-shadow: 0 0 0 3px rgba(16,185,129,.12); outline: none; }
+    .btn { transition: transform .18s, box-shadow .18s, filter .18s; }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .btn:active { transform: translateY(0); }
     .status-badge { padding: 4px 8px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 700; }
     .status-pending { background: rgba(255, 176, 32, 0.2); color: var(--warning); }
     .status-approved { background: rgba(0, 224, 138, 0.2); color: var(--success); }
     .status-rejected { background: rgba(255, 90, 90, 0.2); color: var(--danger); }
 
     /* Modal Styles */
-    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; display: none; align-items: center; justify-content: center; }
+    .modal-overlay { position: fixed; inset: 0; padding: 16px; background: rgba(0,0,0,.78); backdrop-filter: blur(8px); z-index: 1000; display: none; align-items: center; justify-content: center; }
     .modal-overlay.active { display: flex; }
-    .modal-content { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 90%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-content { background: #122019; border: 1px solid rgba(130, 190, 157, .22); border-radius: 20px; width: min(100%, 620px); max-height: min(90vh, 760px); display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,.45); overflow: hidden; }
     .modal-header { padding: var(--spacing-md); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .modal-body { padding: var(--spacing-md); overflow-y: auto; flex: 1; }
-    .modal-footer { padding: var(--spacing-md); border-top: 1px solid var(--border); }
+    .modal-body { padding: clamp(16px, 4vw, 24px); overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 16px clamp(16px, 4vw, 24px); border-top: 1px solid rgba(130, 190, 157, .14); background: rgba(0,0,0,.12); }
+    @media (max-width: 700px) {
+      .admin-header { align-items: flex-start; flex-direction: column; }
+      .admin-header > div:last-child { width: 100%; justify-content: space-between; }
+      .admin-tabs { top: 105px; }
+      .admin-content { padding-top: 22px; }
+      .admin-card { border-radius: 15px; }
+      .admin-table { min-width: 620px; }
+      .admin-content > div[style*="grid-template-columns"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    }
+    @media (max-width: 420px) {
+      .admin-content > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+      .admin-tab { padding-inline: 14px; }
+    }
   </style>
 </head>
 <body>
@@ -248,9 +273,9 @@
         <input type="hidden" id="product-id">
         <label class="form-label">Name<input id="product-name" class="input input-sm" required></label>
         <label class="form-label">Category<select id="product-category" class="input input-sm"><option>Regular</option><option>Limited</option></select></label>
-        <label class="form-label">Price<input id="product-price" type="number" min="0" step="0.01" class="input input-sm"></label>
-        <label class="form-label">Profit<input id="product-profit" type="number" min="0" step="0.01" class="input input-sm"></label>
-        <label class="form-label">Duration (days)<input id="product-duration" type="number" min="1" class="input input-sm"></label>
+        <label class="form-label">Price<input id="product-price" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
+        <label class="form-label">Profit<input id="product-profit" type="number" min="0" step="0.01" value="0" class="input input-sm"></label>
+        <label class="form-label">Duration (days)<input id="product-duration" type="number" min="1" value="1" class="input input-sm"></label>
         <label class="form-label">Payout type<input id="product-payout" class="input input-sm" value="fixed"></label>
         <label class="form-label">Max capacity (Limited)<input id="product-capacity" type="number" min="0" class="input input-sm"></label>
         <label><input id="product-active" type="checkbox" checked> Active</label>
@@ -383,7 +408,7 @@
         <tr>
           <td>${u.email}</td>
           <td>${u.full_name || '-'}</td>
-          <td style="font-weight: 700; color: var(--primary);">${formatCurrency(u.wallets?.[0]?.balance || 0)}</td>
+          <td style="font-weight: 700; color: var(--primary);">${formatCurrency(u.wallet_balance)}</td>
           <td>${u.is_frozen ? '<span class="status-badge status-rejected">Frozen</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
           <td><button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button> <button class="btn btn-sm btn-primary" onclick="adjustUserBalance('${u.id}', '${escapeHtml(u.email || '')}')">Balance</button></td>
         </tr>
@@ -415,9 +440,9 @@
       document.getElementById('product-id').value = product.id || '';
       document.getElementById('product-name').value = product.name || '';
       document.getElementById('product-category').value = product.category || 'Regular';
-      document.getElementById('product-price').value = product.price ?? '';
-      document.getElementById('product-profit').value = product.profit ?? '';
-      document.getElementById('product-duration').value = product.duration_days ?? '';
+      document.getElementById('product-price').value = product.id ? (product.price ?? 0) : 0;
+      document.getElementById('product-profit').value = product.id ? (product.profit ?? 0) : 0;
+      document.getElementById('product-duration').value = product.id ? (product.duration_days ?? 1) : 1;
       document.getElementById('product-payout').value = product.payout_type || 'fixed';
       document.getElementById('product-capacity').value = product.max_capacity ?? '';
       document.getElementById('product-active').checked = product.is_active !== false;
