@@ -397,6 +397,7 @@
       document.getElementById('stat-open-tickets').textContent = data.open_tickets ?? 0;
       document.getElementById('overview-updated').textContent = `Updated ${new Date(data.updated_at || Date.now()).toLocaleTimeString()}`;
     }
+    window.loadDashboard = loadDashboard;
 
     // Deposits
     async function loadDeposits() {
