@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { verifyUser, isAdmin } from '../lib/auth.js';
 import { processDepositRewards } from '../lib/rewards.js';
 
+import { startAfrStarPayout } from '../lib/afrstar-admin.js';
 export default async function handler(req, res) {
   const action = req.query.action;
 
@@ -112,7 +113,15 @@ async function getDeposits(req, res) {
   
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json({ deposits: data || [] });
+  const deposits = data || [];
+  if (!deposits.length) return res.json({ deposits });
+  const { data: gatewayOrders, error: gatewayError } = await supabaseAdmin
+    .from('afrstar_orders')
+    .select('deposit_id, order_sn, order_status, error_message')
+    .in('deposit_id', deposits.map(item => item.id));
+  if (gatewayError) return res.status(500).json({ error: gatewayError.message });
+  const byDeposit = new Map((gatewayOrders || []).map(order => [order.deposit_id, order]));
+  return res.json({ deposits: deposits.map(item => ({ ...item, afrstar: byDeposit.get(item.id) || null })) });
 }
 
 async function processDeposit(req, res) {
@@ -122,11 +131,17 @@ async function processDeposit(req, res) {
 
   const { data: deposit, error: depError } = await supabaseAdmin.from('deposits').select('*').eq('id', deposit_id).single();
   if (depError || !deposit) return res.status(404).json({ error: 'Deposit not found' });
+  if (deposit.payment_method === 'afrstar') {
+    return res.status(409).json({ error: 'AfrStar deposits are settled only by verified gateway callbacks.' });
+  }
   if (deposit.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
   const { error: updateError } = await supabaseAdmin.from('deposits').update({ status }).eq('id', deposit_id);
   if (updateError) return res.status(500).json({ error: updateError.message });
-  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).eq('reference', `DEP_${deposit_id.slice(0, 8).toUpperCase()}`);
+  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).in('reference', [
+    `DEP_${deposit_id.toUpperCase()}`,
+    `DEP_${deposit_id.slice(0, 8).toUpperCase()}`
+  ]);
   if (transactionError) return res.status(500).json({ error: transactionError.message });
 
   if (status === 'approved') {
@@ -155,7 +170,15 @@ async function getWithdrawals(req, res) {
   
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json({ withdrawals: data || [] });
+  const withdrawals = data || [];
+  if (!withdrawals.length) return res.json({ withdrawals });
+  const { data: gatewayOrders, error: gatewayError } = await supabaseAdmin
+    .from('afrstar_orders')
+    .select('withdrawal_id, order_sn, order_status, error_message')
+    .in('withdrawal_id', withdrawals.map(item => item.id));
+  if (gatewayError) return res.status(500).json({ error: gatewayError.message });
+  const byWithdrawal = new Map((gatewayOrders || []).map(order => [order.withdrawal_id, order]));
+  return res.json({ withdrawals: withdrawals.map(item => ({ ...item, afrstar: byWithdrawal.get(item.id) || null })) });
 }
 
 async function processWithdrawal(req, res) {
@@ -167,9 +190,33 @@ async function processWithdrawal(req, res) {
   if (wdError || !withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
   if (withdrawal.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
 
+  const { data: existingGatewayOrder, error: gatewayOrderError } = await supabaseAdmin
+    .from('afrstar_orders')
+    .select('*')
+    .eq('withdrawal_id', withdrawal_id)
+    .maybeSingle();
+  if (gatewayOrderError) return res.status(500).json({ error: gatewayOrderError.message });
+  if (existingGatewayOrder) {
+    if (status === 'approved' && isAfrStarEnabled() && ['awaiting_registration', 'registered'].includes(existingGatewayOrder.order_status)) {
+      const result = await startAfrStarPayout(withdrawal);
+      return res.status(result.statusCode).json(result.body);
+    }
+    if (existingGatewayOrder.order_status === 'submitted' || existingGatewayOrder.order_status === 'creating') {
+      return res.json({ success: true, awaiting_callback: true, order_sn: existingGatewayOrder.order_sn });
+    }
+    return res.status(409).json({ error: 'This AfrStar payout must be resolved from its gateway callback or reconciliation; it cannot be manually approved or rejected.' });
+  }
+  if (status === 'approved' && isAfrStarEnabled()) {
+    const result = await startAfrStarPayout(withdrawal);
+    return res.status(result.statusCode).json(result.body);
+  }
+
   const { error: updateError } = await supabaseAdmin.from('withdrawals').update({ status }).eq('id', withdrawal_id);
   if (updateError) return res.status(500).json({ error: updateError.message });
-  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).eq('reference', `WD_${withdrawal_id.slice(0, 8).toUpperCase()}`);
+  const { error: transactionError } = await supabaseAdmin.from('transactions').update({ status }).in('reference', [
+    `WD_${withdrawal_id.toUpperCase()}`,
+    `WD_${withdrawal_id.slice(0, 8).toUpperCase()}`
+  ]);
   if (transactionError) return res.status(500).json({ error: transactionError.message });
 
   if (status === 'rejected') {
