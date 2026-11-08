@@ -68,21 +68,36 @@ export default async function handler(req, res) {
 // ==========================================
 async function getDashboardStats(res) {
   const [users, deposits, withdrawals, commissions] = await Promise.all([
-    supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
-    supabaseAdmin.from('deposits').select('amount', { count: 'exact', head: true }).eq('status', 'approved'),
-    supabaseAdmin.from('withdrawals').select('amount', { count: 'exact', head: true }).eq('status', 'approved'),
+    supabaseAdmin.from('profiles').select('id'),
+    supabaseAdmin.from('deposits').select('amount').eq('status', 'approved'),
+    supabaseAdmin.from('withdrawals').select('amount').eq('status', 'approved'),
     supabaseAdmin.from('transactions').select('amount').eq('type', 'referral_commission').eq('status', 'approved')
   ]);
+
+  const firstError = [users, deposits, withdrawals, commissions].find((result) => result.error)?.error;
+  if (firstError) return res.status(500).json({ error: firstError.message });
 
   const totalDeposits = deposits.data?.reduce((sum, d) => sum + Number(d.amount), 0) || 0;
   const totalWithdrawals = withdrawals.data?.reduce((sum, w) => sum + Number(w.amount), 0) || 0;
   const totalCommissions = commissions.data?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
 
+  const [pendingDeposits, pendingWithdrawals, openTickets] = await Promise.all([
+    supabaseAdmin.from('deposits').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabaseAdmin.from('withdrawals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabaseAdmin.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'open')
+  ]);
+  const pendingError = [pendingDeposits, pendingWithdrawals, openTickets].find((result) => result.error)?.error;
+  if (pendingError) return res.status(500).json({ error: pendingError.message });
+
   return res.json({
-    total_users: users.count || 0,
+    total_users: users.data?.length || 0,
     total_deposits: totalDeposits,
     total_withdrawals: totalWithdrawals,
-    total_commissions: totalCommissions
+    total_commissions: totalCommissions,
+    pending_deposits: pendingDeposits.count || 0,
+    pending_withdrawals: pendingWithdrawals.count || 0,
+    open_tickets: openTickets.count || 0,
+    updated_at: new Date().toISOString()
   });
 }
 
@@ -177,7 +192,11 @@ async function getUsers(req, res) {
   const query = supabaseAdmin.from('profiles').select('*, wallets(balance)').ilike('email', `%${search}%`).limit(50);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  return res.json({ users: data || [] });
+  const users = (data || []).map((user) => ({
+    ...user,
+    wallet_balance: Number(Array.isArray(user.wallets) ? user.wallets[0]?.balance : user.wallets?.balance) || 0
+  }));
+  return res.json({ users });
 }
 
 async function updateUser(req, res) {
@@ -232,20 +251,29 @@ async function getProducts(res) {
 
 async function saveProduct(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { id, name, category, price, profit, duration_days, payout_type, max_capacity, is_active, is_coming_soon, sort_order } = req.body;
+  const { id, name, category, price, profit, duration_days, payout_type, max_capacity, is_active, is_coming_soon, sort_order } = req.body || {};
+  const parsedPrice = Number(price);
+  const parsedProfit = Number(profit);
+  const parsedDuration = Number(duration_days);
+  const parsedSort = Number(sort_order ?? 0);
+  if (!String(name || '').trim() || !['Regular', 'Limited'].includes(category) || !['daily', 'lump_sum'].includes(payout_type) || !Number.isFinite(parsedPrice) || parsedPrice < 0 || !Number.isFinite(parsedProfit) || parsedProfit < 0 || !Number.isInteger(parsedDuration) || parsedDuration < 1 || !Number.isFinite(parsedSort)) {
+    return res.status(400).json({ error: 'Name, category, payout type, non-negative price/profit, and duration of at least 1 day are required' });
+  }
+  if (category === 'Limited' && (!Number.isInteger(Number(max_capacity)) || Number(max_capacity) < 1)) {
+    return res.status(400).json({ error: 'Limited products require a max capacity of at least 1' });
+  }
 
   const productData = { 
-    name, category, 
-    price: Number(price), 
-    profit: Number(profit), 
-    duration_days: Number(duration_days), 
-    payout_type, 
-    is_active, 
-    is_coming_soon, 
-    sort_order: Number(sort_order) 
+    name: String(name).trim(), category,
+    price: parsedPrice,
+    profit: parsedProfit,
+    duration_days: parsedDuration,
+    payout_type: String(payout_type).trim(),
+    is_active: is_active !== false,
+    is_coming_soon: Boolean(is_coming_soon),
+    sort_order: parsedSort,
+    max_capacity: category === 'Limited' ? Number(max_capacity) : null
   };
-  
-  if (category === 'Limited') productData.max_capacity = Number(max_capacity);
 
   let error;
   if (id) {
