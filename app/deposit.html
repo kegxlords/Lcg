@@ -35,22 +35,24 @@ const presets = [1000, 5000, 10000, 25000];
 
 function shell(balance, content) {
   app.innerHTML = `${UI.topbarHTML('me', balance)}<main class="page page-enter deposit-page">
-    <div class="page-head"><h1>Deposit</h1><p>Submit a manual transfer for review. A request does not credit your wallet immediately.</p></div>${content}
+    <div class="page-head"><h1>Deposit</h1><p>Choose manual bank transfer for review or AfrStar secure checkout.</p></div>${content}
   </main>${UI.bottomNavHTML('me')}`;
 }
 
-function render(balance) {
+function render(balance, afrstarEnabled) {
+  const afrstarOption = afrstarEnabled ? '<option value="afrstar">AfrStar secure checkout</option>' : '';
   shell(balance, `<div class="amt-display card card-pad">
       <div class="lbl">Deposit amount</div>
       <div class="val" id="amount-display">${escapeHTML(money(0))}</div>
-      <div class="small muted">Enter the transfer amount you want reviewed.</div>
+      <div class="small muted">Enter the amount you want to deposit.</div>
     </div>
     <div class="amt-chips" aria-label="Suggested amounts">${presets.map(value => `<button class="amt-chip" type="button" data-preset="${value}">${value >= 1000 ? `${value / 1000}K` : escapeHTML(money(value))}</button>`).join('')}</div>
-    <div class="field" style="margin-top:18px"><label for="deposit-amount">Transfer amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="deposit-amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" required></div></div>
-    <div class="field"><label for="sender-name">Sender name</label><input class="input" id="sender-name" type="text" maxlength="120" autocomplete="name" placeholder="Name used for the transfer" required></div>
-    <div class="field"><label for="payment-method">Payment method</label><div class="method on" aria-label="Bank transfer"><div class="ic-box gold" aria-hidden="true">${UI.icons.bank}</div><div class="body"><div class="t">Bank transfer</div><div class="s">Manual transfer request for review</div></div></div></div>
-    <div class="field"><label for="proof-ref">Transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference" required></div>
-    <div class="card card-pad" style="margin-top:18px"><div class="deposit-note"><div class="ic-box jade" aria-hidden="true">${UI.icons.info}</div><div class="small" style="color:var(--fg-soft)"><strong>Review required</strong><br>Submitting records your deposit request as pending. It is not a card or crypto payment and funds are not credited until the request is reviewed.</div></div></div>
+    <div class="field" style="margin-top:18px"><label for="deposit-amount">Deposit amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="deposit-amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" required></div></div>
+    <div class="field"><label for="payment-method">Payment method</label><select class="input" id="payment-method"><option value="bank_transfer">Manual bank transfer</option>${afrstarOption}</select></div>
+    <div class="field"><label for="sender-name">Payer name</label><input class="input" id="sender-name" type="text" maxlength="120" autocomplete="name" placeholder="Name used for payment" required></div>
+    <div class="field" id="phone-field" hidden><label for="payer-phone">Phone number</label><input class="input" id="payer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="Phone number for AfrStar checkout"></div>
+    <div class="field" id="proof-field"><label for="proof-ref">Bank transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference"></div>
+    <div class="card card-pad" style="margin-top:18px"><div class="deposit-note"><div class="ic-box jade" aria-hidden="true">${UI.icons.info}</div><div class="small" id="deposit-note" style="color:var(--fg-soft)"><strong>Review required</strong><br>Your manual transfer request stays pending until reviewed; no funds are credited when submitted.</div></div></div>
     <div id="deposit-result" aria-live="polite"></div>
     <button class="btn btn-jade btn-block" id="submit-deposit" type="button">${UI.icons.deposit} Submit deposit request</button>`);
 
@@ -58,6 +60,23 @@ function render(balance) {
   const amountDisplay = document.getElementById('amount-display');
   const result = document.getElementById('deposit-result');
   const submit = document.getElementById('submit-deposit');
+  const paymentMethod = document.getElementById('payment-method');
+  const phoneField = document.getElementById('phone-field');
+  const proofField = document.getElementById('proof-field');
+  const note = document.getElementById('deposit-note');
+
+  function updateMethod() {
+    const useAfrStar = paymentMethod.value === 'afrstar';
+    phoneField.hidden = !useAfrStar;
+    proofField.hidden = useAfrStar;
+    note.innerHTML = useAfrStar
+      ? '<strong>Secure checkout</strong><br>You will be redirected to AfrStar. Your wallet is credited only after a verified payment callback.'
+      : '<strong>Review required</strong><br>Your manual transfer request stays pending until reviewed; no funds are credited when submitted.';
+    submit.innerHTML = useAfrStar ? `${UI.icons.deposit} Continue to AfrStar` : `${UI.icons.deposit} Submit deposit request`;
+  }
+  paymentMethod.addEventListener('change', updateMethod);
+  updateMethod();
+
   amountInput.addEventListener('input', () => {
     const amount = safeNumber(amountInput.value);
     amountDisplay.textContent = money(amount !== null && amount > 0 ? amount : 0);
@@ -67,22 +86,35 @@ function render(balance) {
     amountInput.value = button.dataset.preset;
     amountInput.dispatchEvent(new Event('input', { bubbles: true }));
   }));
+
   submit.addEventListener('click', async () => {
     const amount = safeNumber(amountInput.value);
     const senderName = document.getElementById('sender-name').value.trim();
+    const useAfrStar = paymentMethod.value === 'afrstar';
     const proofRef = document.getElementById('proof-ref').value.trim();
-    if (amount === null || amount <= 0 || !senderName || !proofRef) {
-      UI.toast('Enter a valid amount, sender name and transfer reference.','err');
+    const phone = document.getElementById('payer-phone').value.trim();
+    if (amount === null || amount <= 0 || !senderName || (!useAfrStar && !proofRef) || (useAfrStar && !phone)) {
+      UI.toast(useAfrStar ? 'Enter a valid amount, payer name and phone number.' : 'Enter a valid amount, payer name and bank-transfer reference.','err');
       return;
     }
+
     submit.disabled = true;
-    submit.textContent = 'Submitting request…';
+    submit.textContent = useAfrStar ? 'Creating secure checkout…' : 'Submitting request…';
     result.innerHTML = '';
     try {
       const response = await apiRequest('/api/wallet?action=submitDeposit', {
         method: 'POST',
-        body: { amount, sender_name: senderName, payment_method: 'bank_transfer', proof_ref: proofRef }
+        body: useAfrStar
+          ? { amount, sender_name: senderName, phone, payment_method: 'afrstar' }
+          : { amount, sender_name: senderName, payment_method: 'bank_transfer', proof_ref: proofRef }
       });
+      if (useAfrStar) {
+        const checkout = new URL(response?.pay_url || '');
+        if (checkout.protocol !== 'https:') throw new Error('AfrStar returned an invalid checkout URL.');
+        result.innerHTML = '<div class="card card-pad" style="margin-top:14px" role="status"><strong>Opening AfrStar secure checkout…</strong><p class="small muted">Do not refresh or submit a second payment while checkout opens.</p></div>';
+        window.location.assign(checkout.toString());
+        return;
+      }
       const requestId = response?.deposit?.id ?? response?.id ?? response?.request_id ?? response?.reference;
       result.innerHTML = `<div class="card card-pad" style="margin-top:14px" role="status"><strong>Deposit request submitted for review</strong><p class="small muted" style="margin:6px 0 0">Your request is pending review; no funds have been credited yet.${requestId ? `<br>Reference: ${escapeHTML(requestId)}` : ''}</p></div>`;
       UI.toast('Deposit request submitted for review.','ok');
@@ -95,10 +127,11 @@ function render(balance) {
       UI.toast(error?.message || 'Could not submit deposit request.','err');
     } finally {
       submit.disabled = false;
-      submit.innerHTML = `${UI.icons.deposit} Submit deposit request`;
+      updateMethod();
     }
   });
   app.dataset.liveReady = 'true';
+  return { result };
 }
 
 async function load() {
@@ -108,7 +141,17 @@ async function load() {
     const response = await apiRequest('/api/wallet?action=getBalance');
     const balance = safeNumber(response?.balance);
     if (balance === null) throw new Error('The wallet service returned an invalid balance.');
-    render(balance);
+    let afrstarEnabled = false;
+    try {
+      const paymentConfig = await apiRequest('/api/wallet?action=getPaymentConfig');
+      afrstarEnabled = paymentConfig?.afrstar_enabled === true;
+    } catch (_) {
+      // Keep manual deposits available if the gateway configuration endpoint is unavailable.
+    }
+    const rendered = render(balance, afrstarEnabled);
+    if (new URLSearchParams(window.location.search).get('payment') === 'return') {
+      rendered.result.innerHTML = '<div class="card card-pad" style="margin-top:14px" role="status"><strong>Payment confirmation pending</strong><p class="small muted">Your wallet updates only after AfrStar sends a verified callback. Check your wallet history shortly.</p></div>';
+    }
   } catch (error) {
     showPageError(app, error, load);
     app.dataset.liveReady = 'true';

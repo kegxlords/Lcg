@@ -27,22 +27,27 @@
 <script src="../assets/js/app.js"></script>
 <script type="module">
 import { apiRequest, money, escapeHTML, showPageError, showLoading } from '../assets/js/live-data.js';
+import { AFRSTAR_BANKS } from '../assets/js/afrstar-banks.js';
 
 const app = document.getElementById('app');
 const UI = window.LCGUI;
 const safeNumber = value => { const n = Number(value); return Number.isFinite(n) ? n : null; };
 
-function render(balance) {
+function render(balance, afrstarEnabled) {
+  const bankField = afrstarEnabled
+    ? `<div class="field"><label for="bank-code">Bank and AfrStar bank code</label><select class="input" id="bank-code" required><option value="">Select your bank</option>${AFRSTAR_BANKS.map(bank => `<option value="${bank.code}" data-bank-name="${escapeHTML(bank.name)}">${escapeHTML(bank.name)} (${bank.code})</option>`).join('')}</select><span class="small muted">Bank codes are from the supplied AfrStar Nigeria API v2 directory.</span></div>`
+    : '<div class="field"><label for="bank-name">Bank name</label><input class="input" id="bank-name" type="text" maxlength="120" autocomplete="organization" placeholder="Enter bank name" required></div>';
+
   app.innerHTML = `${UI.topbarHTML('me', balance)}<main class="page page-enter withdraw-page">
-    <div class="page-head"><h1>Withdraw</h1><p>Submit a payout request to the bank account entered below. No payout account is saved on this page.</p></div>
+    <div class="page-head"><h1>Withdraw</h1><p>Submit a payout request to the bank account entered below. Payouts are processed after review; AfrStar-enabled payouts complete after a verified callback.</p></div>
     <section class="hero-balance" aria-label="Available balance"><div class="label">Available wallet balance</div><div class="amount">${escapeHTML(money(balance))}</div></section>
     <div class="field" style="margin-top:18px"><label for="withdraw-amount">Withdrawal amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="withdraw-amount" type="number" inputmode="decimal" min="0.01" step="0.01" max="${escapeHTML(balance)}" placeholder="0.00" autocomplete="off" required></div><span class="small muted">Enter a positive amount up to your current available balance. Fees and limits are not estimated here.</span></div>
-    <div class="field"><label for="bank-name">Bank name</label><input class="input" id="bank-name" type="text" maxlength="120" autocomplete="organization" placeholder="Enter bank name" required></div>
+    ${bankField}
     <div class="field"><label for="account-number">Account number</label><input class="input" id="account-number" type="text" inputmode="numeric" maxlength="40" autocomplete="off" placeholder="Enter account number" required></div>
     <div class="field"><label for="account-name">Account name</label><input class="input" id="account-name" type="text" maxlength="120" autocomplete="name" placeholder="Enter account holder name" required></div>
     <div id="withdraw-result" aria-live="polite"></div>
     <button class="btn btn-gold btn-block" id="submit-withdrawal" type="button">${UI.icons.withdraw} Submit withdrawal request</button>
-    <p class="small muted" style="text-align:center;line-height:1.6;margin-top:12px">Submitting a request deducts the requested amount immediately. Processing details and any fee or net amount are shown only when returned by the server.</p>
+    <p class="small muted" style="text-align:center;line-height:1.6;margin-top:12px">Submitting a request deducts the requested amount immediately. Failed AfrStar payouts are refunded only after a verified failure callback.</p>
   </main>${UI.bottomNavHTML('me')}`;
 
   const amountInput = document.getElementById('withdraw-amount');
@@ -50,24 +55,34 @@ function render(balance) {
   const submit = document.getElementById('submit-withdrawal');
   submit.addEventListener('click', async () => {
     const amount = safeNumber(amountInput.value);
-    const bankName = document.getElementById('bank-name').value.trim();
+    const bankSelect = afrstarEnabled ? document.getElementById('bank-code') : null;
+    const bankName = afrstarEnabled
+      ? bankSelect?.selectedOptions?.[0]?.dataset.bankName || ''
+      : document.getElementById('bank-name').value.trim();
+    const bankCode = afrstarEnabled ? bankSelect?.value || '' : '';
     const accountNumber = document.getElementById('account-number').value.trim();
     const accountName = document.getElementById('account-name').value.trim();
-    if (amount === null || amount <= 0 || amount > balance || !bankName || !accountNumber || !accountName) {
-      UI.toast(amount !== null && amount > balance ? 'Amount exceeds your available balance.' : 'Enter a valid amount and complete all bank account details.','err');
+    if (amount === null || amount <= 0 || amount > balance || !bankName || !accountNumber || !accountName || (afrstarEnabled && !/^800\d{5}$/.test(bankCode))) {
+      const message = amount !== null && amount > balance
+        ? 'Amount exceeds your available balance.'
+        : afrstarEnabled && !bankCode
+          ? 'Select a bank from the AfrStar directory.'
+          : 'Enter a valid amount and complete all bank account details.';
+      UI.toast(message, 'err');
       return;
     }
+
     submit.disabled = true;
     submit.textContent = 'Submitting request…';
     result.innerHTML = '';
     try {
       const response = await apiRequest('/api/wallet?action=requestWithdrawal', {
         method: 'POST',
-        body: { amount, bank_name: bankName, account_number: accountNumber, account_name: accountName }
+        body: { amount, bank_name: bankName, bank_code: afrstarEnabled ? bankCode : null, account_number: accountNumber, account_name: accountName }
       });
       const fee = safeNumber(response?.fee ?? response?.fee_amount);
       const net = safeNumber(response?.net ?? response?.net_amount ?? response?.amount_received);
-      const requestId = response?.id ?? response?.request_id ?? response?.reference;
+      const requestId = response?.withdrawal?.id ?? response?.id ?? response?.request_id ?? response?.reference;
       const returnedBalance = safeNumber(response?.balance);
       let effectiveBalance = returnedBalance;
       let balanceNote = '';
@@ -75,11 +90,11 @@ function render(balance) {
         try {
           const balanceResult = await apiRequest('/api/wallet?action=getBalance');
           effectiveBalance = safeNumber(balanceResult?.balance);
-        } catch (_) { /* Request has succeeded; do not turn a balance refresh issue into a false submission error. */ }
+        } catch (_) { /* The withdrawal request itself has already succeeded. */ }
       }
       if (effectiveBalance !== null) balanceNote = `<div class="summary-row"><span class="small muted">Updated available balance</span><span class="tnum">${escapeHTML(money(effectiveBalance))}</span></div>`;
       const responseDetails = `${fee !== null ? `<div class="summary-row"><span class="small muted">Server-returned fee</span><span class="tnum">${escapeHTML(money(fee))}</span></div>` : ''}${net !== null ? `<div class="summary-row"><span class="small muted">Server-returned net amount</span><span class="tnum">${escapeHTML(money(net))}</span></div>` : ''}${requestId ? `<div class="summary-row"><span class="small muted">Request reference</span><span>${escapeHTML(requestId)}</span></div>` : ''}${balanceNote}`;
-      result.innerHTML = `<div class="card card-pad" style="margin-top:16px" role="status"><strong>Withdrawal request submitted</strong><p class="small muted" style="margin:6px 0 0">The requested amount has been deducted from your balance. Payout processing is subject to the server’s review.</p>${responseDetails ? `<div class="withdraw-summary">${responseDetails}</div>` : ''}</div>`;
+      result.innerHTML = `<div class="card card-pad" style="margin-top:16px" role="status"><strong>Withdrawal request submitted</strong><p class="small muted" style="margin:6px 0 0">The requested amount has been deducted from your balance. ${afrstarEnabled ? 'An administrator must approve it; the payout is not final until AfrStar confirms it by callback.' : 'Processing remains subject to review.'}</p>${responseDetails ? `<div class="withdraw-summary">${responseDetails}</div>` : ''}</div>`;
       UI.toast('Withdrawal request submitted.','ok');
       if (effectiveBalance !== null) {
         const amountNode = app.querySelector('.hero-balance .amount');
@@ -104,7 +119,14 @@ async function load() {
     const response = await apiRequest('/api/wallet?action=getBalance');
     const balance = safeNumber(response?.balance);
     if (balance === null) throw new Error('The wallet service returned an invalid balance.');
-    render(balance);
+    let afrstarEnabled = false;
+    try {
+      const config = await apiRequest('/api/wallet?action=getPaymentConfig');
+      afrstarEnabled = config?.afrstar_enabled === true;
+    } catch (_) {
+      // The non-gateway withdrawal flow remains available if the feature flag is unavailable.
+    }
+    render(balance, afrstarEnabled);
   } catch (error) {
     showPageError(app, error, load);
     app.dataset.liveReady = 'true';
