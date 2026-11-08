@@ -40,7 +40,6 @@ function shell(balance, content) {
 }
 
 function render(balance, afrstarEnabled) {
-  const afrstarOption = afrstarEnabled ? '<option value="afrstar">AfrStar secure checkout</option>' : '';
   shell(balance, `<div class="amt-display card card-pad">
       <div class="lbl">Deposit amount</div>
       <div class="val" id="amount-display">${escapeHTML(money(0))}</div>
@@ -48,7 +47,7 @@ function render(balance, afrstarEnabled) {
     </div>
     <div class="amt-chips" aria-label="Suggested amounts">${presets.map(value => `<button class="amt-chip" type="button" data-preset="${value}">${value >= 1000 ? `${value / 1000}K` : escapeHTML(money(value))}</button>`).join('')}</div>
     <div class="field" style="margin-top:18px"><label for="deposit-amount">Deposit amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="deposit-amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" required></div></div>
-    <div class="field"><label for="payment-method">Payment method</label><select class="input" id="payment-method"><option value="bank_transfer">Manual bank transfer</option>${afrstarOption}</select></div>
+    <div class="field"><label for="payment-method">Payment method</label><select class="input" id="payment-method">${afrstarEnabled ? '<option value="afrstar" selected>AfrStar secure checkout</option><option value="bank_transfer">Manual bank transfer</option>' : '<option value="bank_transfer" selected>Manual bank transfer</option>'}</select></div>
     <div class="field"><label for="sender-name">Payer name</label><input class="input" id="sender-name" type="text" maxlength="120" autocomplete="name" placeholder="Name used for payment" required></div>
     <div class="field" id="phone-field" hidden><label for="payer-phone">Phone number</label><input class="input" id="payer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="Phone number for AfrStar checkout"></div>
     <div class="field" id="proof-field"><label for="proof-ref">Bank transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference"></div>
