@@ -8,7 +8,62 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
 <style>
-.dashboard-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);gap:16px;align-items:start}.dashboard-stack{display:flex;flex-direction:column;gap:16px}.dashboard-section{min-width:0}.dashboard-products{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}.dashboard-product{min-width:0}.dashboard-product .name{overflow-wrap:anywhere}.dashboard-intro{margin-bottom:18px}.dashboard-balance{margin:0}.live-list .row{gap:12px}.live-list .body{min-width:0}.live-list .t,.live-list .s{overflow-wrap:anywhere}.dashboard-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.welcome-support{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px;padding:18px;background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(231,200,115,.08));border:1px solid rgba(52,211,153,.24);border-radius:var(--r-xl)}.welcome-support-copy{min-width:0}.welcome-support h2{font:600 18px var(--f-display);margin:3px 0 5px}.welcome-support p{color:var(--fg-soft);font-size:13px;line-height:1.5;margin:0}.support-links{display:flex;flex-wrap:wrap;gap:9px;flex-shrink:0}.support-links .btn{white-space:nowrap}@media(max-width:760px){.dashboard-grid{grid-template-columns:1fr;gap:14px}.dashboard-section{width:100%}.dashboard-products{grid-template-columns:1fr}.dashboard-intro{margin-bottom:14px}.welcome-support{align-items:stretch;flex-direction:column;gap:14px}.support-links{display:grid;grid-template-columns:1fr 1fr}.support-links .btn{justify-content:center}}@media(max-width:380px){.live-list .row{align-items:flex-start}.dashboard-actions{grid-template-columns:1fr 1fr}.support-links{grid-template-columns:1fr}}
+  .dashboard-page { gap: 16px; }
+  .dashboard-intro { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .dashboard-intro h1 { margin:5px 0 0; font:700 clamp(24px, 7vw, 32px)/1.12 var(--f-display); letter-spacing:-.02em; }
+  .dashboard-intro .badge { flex-shrink:0; margin-top:4px; }
+
+  .welcome-support { padding:18px; border:1px solid rgba(52,211,153,.24); border-radius:var(--r-xl); background:linear-gradient(135deg,rgba(16,185,129,.14),rgba(231,200,115,.08)); }
+  .welcome-support h2 { margin:9px 0 6px; font:600 19px/1.2 var(--f-display); }
+  .welcome-support p { margin:0; color:var(--fg-soft); font-size:13px; line-height:1.55; }
+  .support-links { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:16px; }
+  .support-links .btn { min-width:0; padding:0 10px; font-size:12px; }
+  .support-links .btn svg { width:17px; height:17px; flex-shrink:0; }
+
+  .hero-balance { padding:20px; }
+  .hero-balance .amount { font-size:clamp(32px, 10vw, 46px); overflow-wrap:anywhere; }
+  .hero-balance .sub-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .hero-balance .sub-row .sub { min-width:0; }
+  .hero-balance .sub-row .sub .k { font-size:10px; line-height:1.3; }
+  .hero-balance .sub-row .sub .v { font-size:15px; overflow-wrap:anywhere; }
+
+  .dashboard-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .dashboard-actions .btn { width:100%; padding:0 12px; }
+  .dashboard-grid { display:grid; grid-template-columns:1fr; gap:20px; }
+  .dashboard-stack { display:flex; flex-direction:column; gap:20px; min-width:0; }
+  .dashboard-section { min-width:0; }
+  .dashboard-section .section-head { margin-bottom:10px; }
+  .dashboard-section .section-head h2 { font-size:18px; }
+  .dashboard-products { display:grid; grid-template-columns:1fr; gap:10px; }
+  .dashboard-product { display:block; min-width:0; text-decoration:none; }
+  .dashboard-product .name { overflow-wrap:anywhere; }
+  .dashboard-product .product-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .dashboard-product .product-meta { margin-top:12px; }
+  .live-list .row { gap:10px; }
+  .live-list .body { min-width:0; }
+  .live-list .t,.live-list .s { overflow-wrap:anywhere; }
+  .live-list .end { flex-shrink:0; }
+
+  @media (min-width:560px) {
+    .dashboard-page { gap:18px; }
+    .welcome-support { display:flex; align-items:center; justify-content:space-between; gap:22px; }
+    .welcome-support-copy { min-width:0; }
+    .support-links { flex-shrink:0; margin-top:0; }
+    .support-links .btn { font-size:13px; padding:0 14px; }
+    .dashboard-products { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  @media (min-width:860px) {
+    .dashboard-page { padding-left:24px; padding-right:24px; }
+    .dashboard-grid { grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); align-items:start; }
+    .dashboard-products { grid-template-columns:1fr; }
+  }
+  @media (max-width:380px) {
+    .dashboard-intro { flex-direction:column; gap:8px; }
+    .dashboard-intro .badge { margin-top:0; }
+    .hero-balance .sub-row { gap:7px; }
+    .hero-balance .sub-row .sub .k { font-size:9px; }
+    .support-links { grid-template-columns:1fr; }
+  }
 </style>
 </head>
 <body>
@@ -44,14 +99,14 @@ function productCards(products) {
   const featured = products.filter(productAvailable).slice(0,3);
   if (!featured.length) return showEmpty('There are no currently available products to feature.');
   return `<div class="dashboard-products">${featured.map((product) => `
-    <a href="products.html" class="card card-pad dashboard-product" style="display:block;text-decoration:none;">
-      <div class="flex between center" style="gap:10px"><div class="name" style="font-weight:650;font-size:16px;">${escapeHTML(product.name || 'Product')}</div>${ui.icons.chevron}</div>
+    <a href="products.html" class="card card-pad dashboard-product">
+      <div class="flex between center" style="gap:10px"><div class="name" style="font-weight:650;font-size:16px">${escapeHTML(product.name || 'Product')}</div>${ui.icons.chevron}</div>
       <div class="small muted" style="margin-top:5px">${escapeHTML(product.category || 'Uncategorized')}</div>
-      <div class="grid-2" style="margin-top:14px">
+      <div class="product-stats">
         <div><div class="small muted">Price</div><div style="font-weight:600">${money(product.price)}</div></div>
-        <div><div class="small muted">Profit amount</div><div style="font-weight:600;color:var(--jade-light)">${money(product.profit)}</div></div>
+        <div><div class="small muted">Profit</div><div style="font-weight:600;color:var(--jade-light)">${money(product.profit)}</div></div>
       </div>
-      <div class="small muted" style="margin-top:12px">${escapeHTML(product.duration_days ?? '—')} days · ${escapeHTML(product.payout_type || 'Payout details unavailable')}</div>
+      <div class="small muted product-meta">${escapeHTML(product.duration_days ?? '—')} days · ${escapeHTML(product.payout_type || 'Payout details unavailable')}</div>
     </a>`).join('')}</div>`;
 }
 
@@ -66,20 +121,25 @@ function render({profileData, balanceData, investmentData, historyData, productD
   const fullName = user.full_name || user.name || user.display_name || '';
   const firstName = String(fullName).trim().split(/\s+/)[0];
   const greeting = firstName ? `Welcome back, ${escapeHTML(firstName)}` : 'Welcome back';
+
   app.innerHTML = `
     ${ui.topbarHTML('home', balance)}
-    <main class="page page-enter">
-      <div class="flex between center dashboard-intro" style="gap:12px;flex-wrap:wrap"><div><div class="small muted">Your account overview</div><h1 style="font-family:var(--f-display);font-size:clamp(22px,4vw,30px);margin:4px 0 0">${greeting}</h1></div><div class="badge jade">Live account</div></div>
+    <main class="page page-enter dashboard-page">
+      <div class="dashboard-intro"><div><div class="small muted">Your account overview</div><h1>${greeting}</h1></div><div class="badge jade">Live account</div></div>
+
       <section class="welcome-support" aria-label="Welcome and support links">
         <div class="welcome-support-copy"><div class="badge jade">Welcome to LCG</div><h2>We’re here to help you get started</h2><p>Join the LCG community on Telegram or contact support on WhatsApp whenever you need assistance.</p></div>
-        <div class="support-links"><a class="btn btn-jade" href="https://wa.me/2347031622805" target="_blank" rel="noopener noreferrer">${ui.icons.phone} WhatsApp support</a><a class="btn btn-ghost" href="https://t.me/+nP6kJIXYw7A2NGFk" target="_blank" rel="noopener noreferrer">${ui.icons.share} Join Telegram</a></div>
+        <div class="support-links"><a class="btn btn-jade" href="https://wa.me/2347031622805" target="_blank" rel="noopener noreferrer">${ui.icons.phone} WhatsApp</a><a class="btn btn-ghost" href="https://t.me/+nP6kJIXYw7A2NGFk" target="_blank" rel="noopener noreferrer">${ui.icons.share} Telegram</a></div>
       </section>
+
       <section class="hero-balance dashboard-balance" aria-label="Wallet balance">
         <div class="label"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 8px var(--jade-light)"></span> Current balance</div>
         <div class="amount">${money(balance)}</div>
-        <div class="sub-row"><div class="sub"><div class="k">Active investments</div><div class="v">${activeInvestments.length}</div></div><div class="sub"><div class="k">Amount invested</div><div class="v">${money(investedAmount, true)}</div></div><div class="sub"><div class="k">Products available</div><div class="v">${products.filter(productAvailable).length}</div></div></div>
+        <div class="sub-row"><div class="sub"><div class="k">Active investments</div><div class="v">${activeInvestments.length}</div></div><div class="sub"><div class="k">Amount invested</div><div class="v">${money(investedAmount, true)}</div></div><div class="sub"><div class="k">Available products</div><div class="v">${products.filter(productAvailable).length}</div></div></div>
       </section>
-      <div class="dashboard-actions" style="margin:14px 0 20px"><a href="deposit.html" class="btn btn-jade">${ui.icons.deposit} Deposit</a><a href="withdraw.html" class="btn btn-ghost">${ui.icons.withdraw} Withdraw</a></div>
+
+      <div class="dashboard-actions"><a href="deposit.html" class="btn btn-jade">${ui.icons.deposit} Deposit</a><a href="withdraw.html" class="btn btn-ghost">${ui.icons.withdraw} Withdraw</a></div>
+
       <div class="dashboard-grid">
         <div class="dashboard-stack">
           <section class="dashboard-section"><div class="section-head"><h2>Active investments</h2><a href="investments.html" class="link">View all →</a></div>
@@ -89,6 +149,7 @@ function render({profileData, balanceData, investmentData, historyData, productD
         </div>
         <section class="dashboard-section"><div class="section-head"><h2>Featured products</h2><a href="products.html" class="link">View catalog →</a></div>${productCards(products)}</section>
       </div>
+
       <div class="foot-mini"><div class="logo-row">${ui.icons.shield}${ui.icons.lock}</div>LCG · Account information from your live account</div>
     </main>
     ${ui.bottomNavHTML('home')}`;
