@@ -32,9 +32,16 @@ export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
       const redirect = encodeURIComponent(window.location.pathname + window.location.search);
       window.location.assign(`/index.html?redirect=${redirect}`);
     }
-    throw new Error(payload.error || `Request failed (${response.status}).`);
+    throw new Error(readableError(payload.error) || `Request failed (${response.status}).`);
   }
   return payload;
+}
+
+function readableError(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (value.message) return String(value.message);
+  try { return JSON.stringify(value); } catch { return String(value); }
 }
 
 export async function getProfile() {
@@ -65,7 +72,7 @@ export function formatDate(value, options = { dateStyle: 'medium' }) {
 }
 
 export function showPageError(container, error, retry) {
-  const message = escapeHTML(error?.message || 'Could not load your data.');
+  const message = escapeHTML(readableError(error?.message || error) || 'Could not load your data.');
   container.innerHTML = `<div class="data-state data-state-error" role="alert"><strong>Couldn’t load this page</strong><p>${message}</p>${retry ? '<button class="btn btn-ghost btn-sm" data-retry>Try again</button>' : ''}</div>`;
   if (retry) container.querySelector('[data-retry]')?.addEventListener('click', retry);
 }
