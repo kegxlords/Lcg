@@ -8,7 +8,7 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../assets/css/style.css">
 <style>
-.team-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.team-stat{min-width:0;padding:13px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.035)}.team-stat .k{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}.team-stat .v{font:700 clamp(15px,4vw,20px)/1.2 var(--f-display);margin-top:5px;overflow-wrap:anywhere}.data-list{display:flex;flex-direction:column}.data-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border);min-width:0}.data-row:last-child{border-bottom:0;padding-bottom:0}.data-row:first-child{padding-top:0}.data-row .body{min-width:0;flex:1}.data-row .title{font-weight:600;font-size:14px;overflow-wrap:anywhere}.data-row .sub{font-size:12px;color:var(--fg-muted);margin-top:2px}.data-row .end{text-align:right;white-space:nowrap}.data-row .amount{font:600 14px var(--f-display);font-variant-numeric:tabular-nums}.data-row .amount.up{color:var(--jade-light)}.team-hero{background:radial-gradient(120% 80% at 0 0,rgba(231,200,115,.14),transparent 55%),radial-gradient(120% 80% at 100% 100%,rgba(16,185,129,.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))}
+.team-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.team-stat{min-width:0;padding:13px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.035)}.team-stat .k{font-size:10px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}.team-stat .v{font:700 clamp(15px,4vw,20px)/1.2 var(--f-display);margin-top:5px;overflow-wrap:anywhere}.data-list{display:flex;flex-direction:column}.data-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--border);min-width:0}.data-row:last-child{border-bottom:0;padding-bottom:0}.data-row:first-child{padding-top:0}.data-row .body{min-width:0;flex:1}.data-row .title{font-weight:600;font-size:14px;overflow-wrap:anywhere}.data-row .sub{font-size:12px;color:var(--fg-muted);margin-top:2px}.data-row .end{text-align:right;white-space:nowrap}.data-row .amount{font:600 14px var(--f-display);font-variant-numeric:tabular-nums}.data-row .amount.up{color:var(--jade-light)}.team-hero{background:radial-gradient(120% 80% at 0 0,rgba(231,200,115,.14),transparent 55%),radial-gradient(120% 80% at 100% 100%,rgba(16,185,129,.12),transparent 55%),linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))}.referral-link-wrap{margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}.referral-link-label{font-size:11px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}.referral-link-row{display:flex;align-items:center;gap:8px;margin-top:8px}.referral-link{min-width:0;flex:1;padding:11px 12px;border:1px solid var(--border);border-radius:var(--r-md);background:rgba(0,0,0,.16);color:var(--fg-soft);font-size:12px;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}.referral-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.referral-actions .btn{flex:1;min-width:120px}
 @media(min-width:700px){.app{max-width:760px}.team-stats{gap:14px}.team-stat{padding:17px}.team-stat .v{font-size:23px}}
 </style>
 </head>
@@ -40,7 +40,8 @@ function render(referral, downlines, commissions) {
   const active = Number(referral.active_downlines) || 0;
   const spins = Number(referral.available_spins) || 0;
   const earned = commissions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const codeBox = code ? `<div class="flex between center" style="gap:12px;margin-top:8px;flex-wrap:wrap"><div class="ref-code" style="font:700 clamp(20px,5vw,26px) var(--f-display);letter-spacing:.04em;overflow-wrap:anywhere">${escapeHTML(code)}</div><button class="btn btn-ghost btn-sm" type="button" data-copy-code>${ui.icons.copy} Copy code</button></div>` : `<p class="small muted" style="margin-top:8px">A referral code is not available for this account.</p>`;
+  const referralLink = code ? `${window.location.origin}/register.html?ref=${encodeURIComponent(code)}` : '';
+  const codeBox = code ? `<div class="flex between center" style="gap:12px;margin-top:8px;flex-wrap:wrap"><div class="ref-code" style="font:700 clamp(20px,5vw,26px) var(--f-display);letter-spacing:.04em;overflow-wrap:anywhere">${escapeHTML(code)}</div><button class="btn btn-ghost btn-sm" type="button" data-copy-code>${ui.icons.copy} Copy code</button></div><div class="referral-link-wrap"><div class="referral-link-label">Your referral link</div><div class="referral-link-row"><div class="referral-link" id="referral-link">${escapeHTML(referralLink)}</div></div><div class="referral-actions"><button class="btn btn-jade btn-sm" type="button" data-copy-link>${ui.icons.copy} Copy link</button><button class="btn btn-ghost btn-sm" type="button" data-share-link>${ui.icons.share} Share link</button></div></div>` : `<p class="small muted" style="margin-top:8px">A referral code is not available for this account.</p>`;
   const downlineList = downlines.length ? `<div class="data-list">${downlines.map(person => {
     const name = maskedName(person.full_name);
     const initial = escapeHTML((String(person.full_name || '').trim()[0] || 'M').toUpperCase());
@@ -52,7 +53,17 @@ function render(referral, downlines, commissions) {
     <section class="hero-balance team-hero" aria-label="Referral overview"><div class="label" style="color:var(--gold-light)">${ui.icons.gift} Your referral code</div>${codeBox}<div class="team-stats" style="margin-top:20px"><div class="team-stat"><div class="k">Team deposits</div><div class="v">${amount(teamDeposit)}</div></div><div class="team-stat"><div class="k">Downlines</div><div class="v">${downlines.length.toLocaleString('en-NG')}</div></div><div class="team-stat"><div class="k">Active downlines</div><div class="v" style="color:var(--jade-light)">${active.toLocaleString('en-NG')}</div></div></div><div class="small muted" style="margin-top:12px">Available spins: ${spins.toLocaleString('en-NG')}</div></section>
     <section class="card card-pad"><div class="section-head" style="padding:0 0 12px"><h2>Team members</h2><span class="small muted">${downlines.length.toLocaleString('en-NG')} total</span></div>${downlineList}</section>
     <section class="card card-pad"><div class="section-head" style="padding:0 0 12px"><h2>Referral commissions</h2><span class="small muted">${amount(earned)} total</span></div>${commissionList}</section>`;
-  if (code) content.querySelector('[data-copy-code]')?.addEventListener('click', () => ui.copyText(code, 'Referral code'));
+  if (code) {
+    content.querySelector('[data-copy-code]')?.addEventListener('click', () => ui.copyText(code, 'Referral code'));
+    content.querySelector('[data-copy-link]')?.addEventListener('click', () => ui.copyText(referralLink, 'Referral link'));
+    content.querySelector('[data-share-link]')?.addEventListener('click', async () => {
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Join LCG', text: 'Join LCG using my referral link:', url: referralLink }); } catch (_) {}
+      } else {
+        await ui.copyText(referralLink, 'Referral link');
+      }
+    });
+  }
   app.dataset.liveReady = 'true';
 }
 async function load() {
