@@ -34,11 +34,6 @@
   .dashboard-section { min-width:0; }
   .dashboard-section .section-head { margin-bottom:10px; }
   .dashboard-section .section-head h2 { font-size:18px; }
-  .dashboard-products { display:grid; grid-template-columns:1fr; gap:10px; }
-  .dashboard-product { display:block; min-width:0; text-decoration:none; }
-  .dashboard-product .name { overflow-wrap:anywhere; }
-  .dashboard-product .product-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
-  .dashboard-product .product-meta { margin-top:12px; }
   .live-list .row { gap:10px; }
   .live-list .body { min-width:0; }
   .live-list .t,.live-list .s { overflow-wrap:anywhere; }
@@ -50,12 +45,10 @@
     .welcome-support-copy { min-width:0; }
     .support-links { flex-shrink:0; margin-top:0; }
     .support-links .btn { font-size:13px; padding:0 14px; }
-    .dashboard-products { grid-template-columns:repeat(2,minmax(0,1fr)); }
   }
   @media (min-width:860px) {
     .dashboard-page { padding-left:24px; padding-right:24px; }
     .dashboard-grid { grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr); align-items:start; }
-    .dashboard-products { grid-template-columns:1fr; }
   }
   @media (max-width:380px) {
     .dashboard-intro { flex-direction:column; gap:8px; }
@@ -90,31 +83,10 @@ function transactionRows(transactions) {
   }).join('')}</div>`;
 }
 
-function productAvailable(product) {
-  const hasCapacity = product.category !== 'Limited' || !(Number(product.max_capacity) > 0) || Number(product.current_sold || 0) < Number(product.max_capacity);
-  return product.is_active === true && product.is_coming_soon !== true && hasCapacity;
-}
-
-function productCards(products) {
-  const featured = products.filter(productAvailable).slice(0,3);
-  if (!featured.length) return showEmpty('There are no currently available products to feature.');
-  return `<div class="dashboard-products">${featured.map((product) => `
-    <a href="products.html" class="card card-pad dashboard-product">
-      <div class="flex between center" style="gap:10px"><div class="name" style="font-weight:650;font-size:16px">${escapeHTML(product.name || 'Product')}</div>${ui.icons.chevron}</div>
-      <div class="small muted" style="margin-top:5px">${escapeHTML(product.category || 'Uncategorized')}</div>
-      <div class="product-stats">
-        <div><div class="small muted">Price</div><div style="font-weight:600">${money(product.price)}</div></div>
-        <div><div class="small muted">Profit</div><div style="font-weight:600;color:var(--jade-light)">${money(product.profit)}</div></div>
-      </div>
-      <div class="small muted product-meta">${escapeHTML(product.duration_days ?? '—')} days · ${escapeHTML(product.payout_type || 'Payout details unavailable')}</div>
-    </a>`).join('')}</div>`;
-}
-
-function render({profileData, balanceData, investmentData, historyData, productData}) {
+function render({profileData, balanceData, investmentData, historyData}) {
   const balance = Number(balanceData?.balance || 0);
   const investments = Array.isArray(investmentData?.investments) ? investmentData.investments : [];
   const transactions = Array.isArray(historyData?.transactions) ? historyData.transactions : [];
-  const products = Array.isArray(productData?.products) ? productData.products : [];
   const activeInvestments = investments.filter((item) => String(item.status || '').toLowerCase() === 'active');
   const investedAmount = activeInvestments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const user = profileData?.profile || profileData?.user || {};
@@ -135,7 +107,7 @@ function render({profileData, balanceData, investmentData, historyData, productD
       <section class="hero-balance dashboard-balance" aria-label="Wallet balance">
         <div class="label"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--jade-light);box-shadow:0 0 8px var(--jade-light)"></span> Current balance</div>
         <div class="amount">${money(balance)}</div>
-        <div class="sub-row"><div class="sub"><div class="k">Active investments</div><div class="v">${activeInvestments.length}</div></div><div class="sub"><div class="k">Amount invested</div><div class="v">${money(investedAmount, true)}</div></div><div class="sub"><div class="k">Available products</div><div class="v">${products.filter(productAvailable).length}</div></div></div>
+        <div class="sub-row"><div class="sub"><div class="k">Active investments</div><div class="v">${activeInvestments.length}</div></div><div class="sub"><div class="k">Amount invested</div><div class="v">${money(investedAmount, true)}</div></div></div>
       </section>
 
       <div class="dashboard-actions"><a href="deposit.html" class="btn btn-jade">${ui.icons.deposit} Deposit</a><a href="withdraw.html" class="btn btn-ghost">${ui.icons.withdraw} Withdraw</a></div>
@@ -147,7 +119,6 @@ function render({profileData, balanceData, investmentData, historyData, productD
           </section>
           <section class="dashboard-section"><div class="section-head"><h2>Recent transactions</h2><a href="wallet.html" class="link">Wallet →</a></div><div class="card card-pad">${transactionRows(transactions)}</div></section>
         </div>
-        <section class="dashboard-section"><div class="section-head"><h2>Featured products</h2><a href="products.html" class="link">View catalog →</a></div>${productCards(products)}</section>
       </div>
 
       <div class="foot-mini"><div class="logo-row">${ui.icons.shield}${ui.icons.lock}</div>LCG · Account information from your live account</div>
@@ -161,14 +132,13 @@ async function load() {
   app.setAttribute('aria-busy', 'true');
   showLoading(app, 'Loading your live account…');
   try {
-    const [profileData, balanceData, investmentData, historyData, productData] = await Promise.all([
+    const [profileData, balanceData, investmentData, historyData] = await Promise.all([
       getProfile(),
       apiRequest('/api/wallet?action=getBalance'),
       apiRequest('/api/investments?action=getInvestments'),
-      apiRequest('/api/wallet?action=getHistory'),
-      apiRequest('/api/products?action=getProducts')
+      apiRequest('/api/wallet?action=getHistory')
     ]);
-    render({profileData, balanceData, investmentData, historyData, productData});
+    render({profileData, balanceData, investmentData, historyData});
     app.dataset.liveReady = 'true';
   } catch (error) {
     showPageError(app, error, load);
