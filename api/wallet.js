@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   }
 }
 
-function getPaymentConfig(res) {
+async function getPaymentConfig(res) {
   let afrstarEnabled = false;
   if (isAfrStarEnabled()) {
     try {
@@ -46,7 +46,19 @@ function getPaymentConfig(res) {
       if (!(error instanceof AfrStarConfigurationError)) throw error;
     }
   }
-  return res.json({ afrstar_enabled: afrstarEnabled });
+  const { data: settings, error } = await supabaseAdmin
+    .from('site_settings')
+    .select('key, value')
+    .in('key', ['deposit_bank_name', 'deposit_account_number', 'deposit_account_name']);
+  if (error) return res.status(500).json({ error: 'Unable to load deposit bank details.' });
+  const values = Object.fromEntries((settings || []).map((item) => [item.key, item.value]));
+  return res.json({
+    afrstar_enabled: afrstarEnabled,
+    bank_transfer_enabled: true,
+    bank_name: values.deposit_bank_name || '',
+    account_number: values.deposit_account_number || '',
+    account_name: values.deposit_account_name || ''
+  });
 }
 
 async function getBalance(userId, res) {
