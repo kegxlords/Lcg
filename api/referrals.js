@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
     switch (action) {
-      case 'getReferralInfo': return await getReferralInfo(user.id, res);
+      case 'getReferralInfo': return await getReferralInfo(user, res);
       case 'getDownlines': return await getDownlines(user.id, res);
       case 'getCommissions': return await getCommissions(user.id, res);
       default: return res.status(400).json({ error: 'Invalid action' });
@@ -18,8 +18,30 @@ export default async function handler(req, res) {
   }
 }
 
-async function getReferralInfo(userId, res) {
-  const { data: profile } = await supabaseAdmin.from('profiles').select('referral_code, total_team_deposit, active_downlines').eq('id', userId).single();
+async function getReferralInfo(user, res) {
+  const userId = user.id;
+  const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('id, referral_code, upline_id, total_team_deposit, active_downlines').eq('id', userId).single();
+  if (profileError || !profile) return res.status(404).json({ error: 'Profile not found' });
+
+  // Older registrations stored the sponsor code in auth metadata but did not
+  // populate profiles.upline_id. Repair that link once the authenticated user
+  // opens the team page so existing downlines become visible.
+  if (!profile.upline_id) {
+    const sponsorCode = String(user.user_metadata?.referral_code || '').trim().toUpperCase();
+    if (sponsorCode) {
+      const { data: sponsor, error: sponsorError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .ilike('referral_code', sponsorCode)
+        .neq('id', userId)
+        .maybeSingle();
+      if (sponsorError) return res.status(500).json({ error: sponsorError.message });
+      if (sponsor) {
+        const { error: linkError } = await supabaseAdmin.from('profiles').update({ upline_id: sponsor.id }).eq('id', userId).is('upline_id', null);
+        if (linkError) return res.status(500).json({ error: linkError.message });
+      }
+    }
+  }
   
   // Count available spins
   const { count: availableSpins } = await supabaseAdmin
