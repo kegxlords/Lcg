@@ -128,7 +128,7 @@
       </div>
       <div class="overview-lower">
         <section class="admin-card attention-card"><div class="card-title-row"><div><p class="eyebrow">ACTION QUEUE</p><h3>Needs your attention</h3></div><span class="live-dot">LIVE</span></div><button class="queue-row" onclick="switchTab('deposits', document.querySelector('.admin-tab:nth-child(2)'))"><span class="queue-icon gold"><i class="fa-solid fa-building-columns"></i></span><span><strong>Pending deposits</strong><small>Review and approve incoming funding</small></span><b id="stat-pending-deposits">—</b><i class="fa-solid fa-chevron-right"></i></button><button class="queue-row" onclick="switchTab('withdrawals', document.querySelector('.admin-tab:nth-child(3)'))"><span class="queue-icon rose"><i class="fa-solid fa-money-bill-transfer"></i></span><span><strong>Pending withdrawals</strong><small>Review payout requests</small></span><b id="stat-pending-withdrawals">—</b><i class="fa-solid fa-chevron-right"></i></button><button class="queue-row" onclick="switchTab('support', document.querySelector('.admin-tab:nth-child(8)'))"><span class="queue-icon blue"><i class="fa-solid fa-headset"></i></span><span><strong>Open support tickets</strong><small>Respond to customers waiting for help</small></span><b id="stat-open-tickets">—</b><i class="fa-solid fa-chevron-right"></i></button></section>
-        <section class="admin-card quick-card"><p class="eyebrow">SHORTCUTS</p><h3>Quick actions</h3><div class="quick-actions"><button onclick="switchTab('products', document.querySelector('.admin-tab:nth-child(5)'))"><i class="fa-solid fa-plus"></i><span>Add product</span></button><button onclick="switchTab('wheel', document.querySelector('.admin-tab:nth-child(6)'))"><i class="fa-solid fa-dharmachakra"></i><span>Configure wheel</span></button><button onclick="switchTab('users', document.querySelector('.admin-tab:nth-child(4)'))"><i class="fa-solid fa-user-gear"></i><span>Manage users</span></button><button onclick="switchTab('settings', document.querySelector('.admin-tab:nth-child(9)'))"><i class="fa-solid fa-sliders"></i><span>Site settings</span></button></div></section>
+        <section class="admin-card quick-card"><p class="eyebrow">SHORTCUTS</p><h3>Quick actions</h3><div class="quick-actions"><button onclick="openIncomeModal()"><i class="fa-solid fa-hand-holding-dollar"></i><span>Drop income</span></button><button onclick="switchTab('products', document.querySelector('.admin-tab:nth-child(5)'))"><i class="fa-solid fa-plus"></i><span>Add product</span></button><button onclick="switchTab('wheel', document.querySelector('.admin-tab:nth-child(6)'))"><i class="fa-solid fa-dharmachakra"></i><span>Configure wheel</span></button><button onclick="switchTab('users', document.querySelector('.admin-tab:nth-child(4)'))"><i class="fa-solid fa-user-gear"></i><span>Manage users</span></button><button onclick="switchTab('settings', document.querySelector('.admin-tab:nth-child(9)'))"><i class="fa-solid fa-sliders"></i><span>Site settings</span></button></div></section>
       </div>
     </div>
 
@@ -321,6 +321,20 @@
     </div>
   </div>
 
+  <!-- Income credit modal -->
+  <div id="income-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header"><h3>Drop income</h3><button class="btn btn-ghost btn-sm" onclick="closeIncomeModal()"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="modal-body" style="display:grid;gap:12px;">
+        <p class="small muted" style="margin:0">Credit a user’s wallet and record the payment in their transaction history.</p>
+        <label class="form-label">User<select id="income-user" class="input input-sm" required><option value="">Loading users…</option></select></label>
+        <label class="form-label">Amount (₦)<input id="income-amount" type="number" min="0.01" step="0.01" class="input input-sm" placeholder="0.00" required></label>
+        <label class="form-label">Reason<input id="income-reason" type="text" maxlength="160" class="input input-sm" placeholder="e.g. Weekly income payout"></label>
+      </div>
+      <div class="modal-footer"><div id="income-form-error" class="small" style="color:var(--danger);margin-bottom:10px;min-height:1em;"></div><button class="btn btn-primary btn-block" onclick="submitDropIncome()"><i class="fa-solid fa-hand-holding-dollar"></i> Credit income</button></div>
+    </div>
+  </div>
+
   <script type="module">
     import { requireAdmin } from '/assets/js/auth-guard.js';
     import { supabase, formatCurrency } from '/assets/js/lcg-client.js';
@@ -450,7 +464,7 @@
           <td>${u.full_name || '-'}</td>
           <td style="font-weight: 700; color: var(--primary);">${formatCurrency(u.wallet_balance)}</td>
           <td>${u.is_frozen ? '<span class="status-badge status-rejected">Frozen</span>' : '<span class="status-badge status-approved">Active</span>'}</td>
-          <td><button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button> <button class="btn btn-sm btn-primary" onclick="adjustUserBalance('${u.id}', '${escapeHtml(u.email || '')}')">Balance</button></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="toggleFreeze('${u.id}', ${!u.is_frozen})">${u.is_frozen ? 'Unfreeze' : 'Freeze'}</button> <button class="btn btn-sm btn-primary" onclick="adjustUserBalance('${u.id}', '${escapeHtml(u.email || '')}')">Balance</button> <button class="btn btn-sm btn-primary" onclick="openIncomeModal('${u.id}', '${escapeHtml(u.email || '')}')">Income</button></td>
         </tr>
       `).join('');
     }
@@ -526,6 +540,53 @@
       await apiCall('adjustBalance', 'POST', { user_id: id, type, amount, reason });
       loadUsers();
       loadDashboard();
+    };
+
+    window.openIncomeModal = async (selectedId = '', selectedEmail = '') => {
+      const modal = document.getElementById('income-modal');
+      const select = document.getElementById('income-user');
+      document.getElementById('income-form-error').textContent = '';
+      document.getElementById('income-amount').value = '';
+      document.getElementById('income-reason').value = '';
+      select.innerHTML = '<option value="">Loading users…</option>';
+      modal.classList.add('active');
+      try {
+        const data = await apiCall('getUsers');
+        const users = Array.isArray(data.users) ? data.users : [];
+        select.innerHTML = '<option value="">Select a user</option>' + users.map((user) => {
+          const label = `${user.email || 'Unknown email'}${user.full_name ? ` — ${user.full_name}` : ''} · Balance ${formatCurrency(user.wallet_balance)}`;
+          return `<option value="${escapeHtml(user.id)}">${escapeHtml(label)}</option>`;
+        }).join('');
+        if (selectedId && users.some((user) => String(user.id) === String(selectedId))) select.value = selectedId;
+        else if (selectedEmail) {
+          const match = users.find((user) => String(user.email || '').toLowerCase() === String(selectedEmail).toLowerCase());
+          if (match) select.value = match.id;
+        }
+      } catch (error) {
+        select.innerHTML = '<option value="">Could not load users</option>';
+        document.getElementById('income-form-error').textContent = error.message || 'Could not load users';
+      }
+    };
+    window.closeIncomeModal = () => document.getElementById('income-modal').classList.remove('active');
+    window.submitDropIncome = async () => {
+      const userId = document.getElementById('income-user').value;
+      const amount = Number(document.getElementById('income-amount').value);
+      const reason = document.getElementById('income-reason').value.trim() || 'Admin income payout';
+      const errorTarget = document.getElementById('income-form-error');
+      errorTarget.textContent = '';
+      if (!userId || !Number.isFinite(amount) || amount <= 0) {
+        errorTarget.textContent = 'Select a user and enter a positive amount.';
+        return;
+      }
+      if (!confirm(`Credit ${formatCurrency(amount)} to this user’s wallet?`)) return;
+      try {
+        await apiCall('dropIncome', 'POST', { user_id: userId, amount, reason, type: 'credit' });
+        closeIncomeModal();
+        loadUsers();
+        loadDashboard();
+      } catch (error) {
+        errorTarget.textContent = error.message || 'Could not credit income';
+      }
     };
 
     // Wheel
