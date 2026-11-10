@@ -358,9 +358,15 @@
     };
 
     const apiCall = async (action, method = 'GET', body = null) => {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token) {
+        const message = 'Your admin session has expired. Please sign in again.';
+        showAdminStatus(message, true);
+        throw new Error(message);
+      }
       const opts = {
         method,
-        headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session.access_token}` }
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
       };
       if (body) {
         opts.headers['Content-Type'] = 'application/json';
@@ -536,10 +542,15 @@
       if (!['credit', 'debit'].includes(type)) return;
       const amount = prompt('Amount:');
       const reason = prompt('Reason:') || 'Admin adjustment';
-      if (!amount) return;
-      await apiCall('adjustBalance', 'POST', { user_id: id, type, amount, reason });
-      loadUsers();
-      loadDashboard();
+      if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+        showAdminStatus('Enter a positive amount', true);
+        return;
+      }
+      try {
+        await apiCall('adjustBalance', 'POST', { user_id: id, type, amount: Number(amount), reason });
+        showAdminStatus(type === 'credit' ? 'User credited successfully' : 'User debited successfully');
+        await Promise.all([loadUsers(), loadDashboard()]);
+      } catch (_) {}
     };
 
     window.openIncomeModal = async (selectedId = '', selectedEmail = '') => {
@@ -582,8 +593,8 @@
       try {
         await apiCall('dropIncome', 'POST', { user_id: userId, amount, reason, type: 'credit' });
         closeIncomeModal();
-        loadUsers();
-        loadDashboard();
+        showAdminStatus('Income credited successfully');
+        await Promise.all([loadUsers(), loadDashboard()]);
       } catch (error) {
         errorTarget.textContent = error.message || 'Could not credit income';
       }
