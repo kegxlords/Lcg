@@ -276,8 +276,16 @@ async function applyBalanceAdjustment(req, res, { allowDebit, transactionType, l
     return res.status(400).json({ error: allowDebit ? 'User, positive amount, and credit/debit type are required' : 'User and a positive income amount are required' });
   }
 
+  const { data: targetUser, error: targetUserError } = await supabaseAdmin.from('profiles').select('id').eq('id', user_id).maybeSingle();
+  if (targetUserError) return res.status(500).json({ error: targetUserError.message });
+  if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+  // Some legacy accounts were created before the wallet trigger existed.
+  // Create the zero-balance row on demand so admin credits work for them too.
+  const { error: walletCreateError } = await supabaseAdmin.from('wallets').upsert({ user_id, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true });
+  if (walletCreateError) return res.status(500).json({ error: walletCreateError.message });
   const { data: wallet, error: walletError } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
-  if (walletError || !wallet) return res.status(404).json({ error: walletError?.message || 'Wallet not found' });
+  if (walletError || !wallet) return res.status(500).json({ error: walletError?.message || 'Wallet could not be initialized' });
   let newBalance = Number(wallet?.balance || 0);
   
   if (type === 'credit') newBalance += parsedAmount;
@@ -295,7 +303,10 @@ async function applyBalanceAdjustment(req, res, { allowDebit, transactionType, l
     reference: `${transactionType === 'admin_income' ? 'INCOME' : 'ADMIN'}_${Date.now()}_${String(user_id).slice(0, 8).toUpperCase()}`,
     description: `${label} ${type}: ${String(reason || 'No reason provided').trim()}`
   });
-  if (transactionError) return res.status(500).json({ error: transactionError.message });
+  if (transactionError) {
+    await supabaseAdmin.from('wallets').update({ balance: Number(wallet.balance || 0), updated_at: new Date().toISOString() }).eq('user_id', user_id);
+    return res.status(500).json({ error: `Credit was not recorded: ${transactionError.message}` });
+  }
 
   return res.json({ success: true, new_balance: newBalance });
 }
