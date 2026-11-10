@@ -462,8 +462,8 @@
 
     // Users
     async function loadUsers() {
-      const search = document.getElementById('user-search').value;
-      const data = await apiCall(`getUsers&search=${search}`);
+      const search = document.getElementById('user-search').value.trim();
+      const data = await apiCall(`getUsers&search=${encodeURIComponent(search)}`);
       document.querySelector('#user-table tbody').innerHTML = data.users.map(u => `
         <tr>
           <td>${u.email}</td>
@@ -474,6 +474,7 @@
         </tr>
       `).join('');
     }
+    window.loadUsers = loadUsers;
     window.toggleFreeze = async (id, status) => {
       await apiCall('updateUser', 'POST', { user_id: id, is_frozen: status });
       loadUsers();
