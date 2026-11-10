@@ -41,13 +41,19 @@ if (loginForm) {
 }
 
 if (registerForm) {
+  const referralInput = document.getElementById('ref');
+  const referralFromUrl = new URLSearchParams(window.location.search).get('ref');
+  if (referralInput && referralFromUrl && !referralInput.value.trim()) {
+    referralInput.value = referralFromUrl.trim().toUpperCase();
+  }
+
   registerForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const fullName = document.getElementById('name').value.trim();
     const email = document.getElementById('email').value.trim();
     const phone = document.getElementById('phone').value.trim();
     const password = document.getElementById('pw').value;
-    const referralCode = document.getElementById('ref').value.trim();
+    const referralCode = document.getElementById('ref').value.trim().toUpperCase();
     const agreed = document.getElementById('agree').classList.contains('on');
 
     if (password.length < 8 || !/\d/.test(password) || !/[A-Z]/.test(password)) {
