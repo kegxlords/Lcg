@@ -29,6 +29,7 @@ export default async function handler(req, res) {
       case 'getUsers': return await getUsers(req, res);
       case 'updateUser': return await updateUser(req, res);
       case 'adjustBalance': return await adjustBalance(req, res);
+      case 'dropIncome': return await dropIncome(req, res);
       
       // Products
       case 'getProducts': return await getProducts(res);
@@ -260,11 +261,19 @@ async function updateUser(req, res) {
 }
 
 async function adjustBalance(req, res) {
+  return applyBalanceAdjustment(req, res, { allowDebit: true, transactionType: null, label: 'Admin' });
+}
+
+async function dropIncome(req, res) {
+  return applyBalanceAdjustment(req, res, { allowDebit: false, transactionType: 'admin_income', label: 'Admin income' });
+}
+
+async function applyBalanceAdjustment(req, res, { allowDebit, transactionType, label }) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { user_id, amount, type, reason } = req.body;
+  const { user_id, amount, type = 'credit', reason } = req.body || {};
   const parsedAmount = Number(amount);
-  if (!user_id || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || !['credit', 'debit'].includes(type)) {
-    return res.status(400).json({ error: 'User, positive amount, and credit/debit type are required' });
+  if (!user_id || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || (!allowDebit && type !== 'credit') || (allowDebit && !['credit', 'debit'].includes(type))) {
+    return res.status(400).json({ error: allowDebit ? 'User, positive amount, and credit/debit type are required' : 'User and a positive income amount are required' });
   }
 
   const { data: wallet, error: walletError } = await supabaseAdmin.from('wallets').select('balance').eq('user_id', user_id).single();
@@ -279,8 +288,12 @@ async function adjustBalance(req, res) {
   if (balanceError) return res.status(500).json({ error: balanceError.message });
   
   const { error: transactionError } = await supabaseAdmin.from('transactions').insert({
-    user_id, type: `admin_${type}`, amount: parsedAmount, status: 'approved',
-    reference: `ADMIN_${Date.now()}`, description: `Admin ${type}: ${reason}`
+    user_id,
+    type: transactionType || `admin_${type}`,
+    amount: parsedAmount,
+    status: 'approved',
+    reference: `${transactionType === 'admin_income' ? 'INCOME' : 'ADMIN'}_${Date.now()}_${String(user_id).slice(0, 8).toUpperCase()}`,
+    description: `${label} ${type}: ${String(reason || 'No reason provided').trim()}`
   });
   if (transactionError) return res.status(500).json({ error: transactionError.message });
 
