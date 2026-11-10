@@ -33,23 +33,21 @@ const UI = window.LCGUI;
 const safeNumber = value => { const n = Number(value); return Number.isFinite(n) ? n : null; };
 const presets = [1000, 5000, 10000, 25000];
 
-function shell(balance, content, afrstarEnabled) {
-  const intro = afrstarEnabled
-    ? 'Pay your deposit through AfrStar secure checkout. Manual bank transfer is unavailable while AfrStar is enabled.'
-    : 'Submit a manual bank-transfer deposit request for review.';
+function shell(balance, content) {
+  const intro = 'Transfer funds to the account below, then submit your bank-transfer reference for review.';
   app.innerHTML = `${UI.topbarHTML('me', balance)}<main class="page page-enter deposit-page">
     <div class="page-head"><h1>Deposit</h1><p>${intro}</p></div>${content}
   </main>${UI.bottomNavHTML('me')}`;
 }
 
-function render(balance, afrstarEnabled) {
-  const paymentFields = afrstarEnabled
-    ? `<div class="field"><label for="payer-phone">Phone number</label><input class="input" id="payer-phone" type="tel" maxlength="40" autocomplete="tel" placeholder="Phone number for AfrStar checkout" required></div>`
-    : `<div class="field"><label for="proof-ref">Bank transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference" required></div>`;
-  const note = afrstarEnabled
-    ? '<strong>AfrStar secure checkout</strong><br>You will be redirected to AfrStar to complete payment. Your wallet is credited only after a verified payment callback.'
-    : '<strong>Review required</strong><br>Your manual transfer request stays pending until reviewed; no funds are credited when submitted.';
-  const buttonLabel = afrstarEnabled ? 'Continue to AfrStar' : 'Submit deposit request';
+function render(balance, paymentConfig = {}) {
+  const bankName = String(paymentConfig.bank_name || 'Bank details not configured');
+  const accountNumber = String(paymentConfig.account_number || '—');
+  const accountName = String(paymentConfig.account_name || '—');
+  const bankDetails = `<div class="card card-pad" style="margin-top:18px"><div class="small muted" style="text-transform:uppercase;letter-spacing:.08em">Transfer to</div><div style="display:grid;gap:8px;margin-top:12px"><div><span class="small muted">Bank</span><br><strong>${escapeHTML(bankName)}</strong></div><div><span class="small muted">Account number</span><br><strong style="font-variant-numeric:tabular-nums;letter-spacing:.04em">${escapeHTML(accountNumber)}</strong></div><div><span class="small muted">Account name</span><br><strong>${escapeHTML(accountName)}</strong></div></div></div>`;
+  const paymentFields = `<div class="field"><label for="proof-ref">Bank transfer reference</label><input class="input" id="proof-ref" type="text" maxlength="160" autocomplete="off" placeholder="Enter your transfer reference" required></div>`;
+  const note = '<strong>Review required</strong><br>Your manual transfer request stays pending until reviewed; no funds are credited when submitted.';
+  const buttonLabel = 'Submit deposit request';
 
   shell(balance, `<div class="amt-display card card-pad">
       <div class="lbl">Deposit amount</div>
@@ -58,11 +56,12 @@ function render(balance, afrstarEnabled) {
     </div>
     <div class="amt-chips" aria-label="Suggested amounts">${presets.map(value => `<button class="amt-chip" type="button" data-preset="${value}">${value >= 1000 ? `${value / 1000}K` : escapeHTML(money(value))}</button>`).join('')}</div>
     <div class="field" style="margin-top:18px"><label for="deposit-amount">Deposit amount</label><div class="input-wrap"><span class="lead" aria-hidden="true" style="color:var(--jade-light);font-weight:600">₦</span><input class="input has-lead" id="deposit-amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" autocomplete="off" required></div></div>
+    ${bankDetails}
     <div class="field"><label for="sender-name">Payer name</label><input class="input" id="sender-name" type="text" maxlength="120" autocomplete="name" placeholder="Name used for payment" required></div>
     ${paymentFields}
     <div class="card card-pad" style="margin-top:18px"><div class="deposit-note"><div class="ic-box jade" aria-hidden="true">${UI.icons.info}</div><div class="small" style="color:var(--fg-soft)">${note}</div></div></div>
     <div id="deposit-result" aria-live="polite"></div>
-    <button class="btn btn-jade btn-block" id="submit-deposit" type="button">${UI.icons.deposit} ${buttonLabel}</button>`, afrstarEnabled);
+    <button class="btn btn-jade btn-block" id="submit-deposit" type="button">${UI.icons.deposit} ${buttonLabel}</button>`);
 
   const amountInput = document.getElementById('deposit-amount');
   const amountDisplay = document.getElementById('amount-display');
@@ -82,30 +81,20 @@ function render(balance, afrstarEnabled) {
   submit.addEventListener('click', async () => {
     const amount = safeNumber(amountInput.value);
     const senderName = document.getElementById('sender-name').value.trim();
-    const phone = afrstarEnabled ? document.getElementById('payer-phone').value.trim() : '';
-    const proofRef = afrstarEnabled ? '' : document.getElementById('proof-ref').value.trim();
-    if (amount === null || amount <= 0 || !senderName || (afrstarEnabled && !phone) || (!afrstarEnabled && !proofRef)) {
-      UI.toast(afrstarEnabled ? 'Enter a valid amount, payer name and phone number.' : 'Enter a valid amount, payer name and bank-transfer reference.','err');
+    const proofRef = document.getElementById('proof-ref').value.trim();
+    if (amount === null || amount <= 0 || !senderName || !proofRef) {
+      UI.toast('Enter a valid amount, payer name and bank-transfer reference.','err');
       return;
     }
 
     submit.disabled = true;
-    submit.textContent = afrstarEnabled ? 'Creating secure checkout…' : 'Submitting request…';
+    submit.textContent = 'Submitting request…';
     result.innerHTML = '';
     try {
       const response = await apiRequest('/api/wallet?action=submitDeposit', {
         method: 'POST',
-        body: afrstarEnabled
-          ? { amount, sender_name: senderName, phone, payment_method: 'afrstar' }
-          : { amount, sender_name: senderName, payment_method: 'bank_transfer', proof_ref: proofRef }
+        body: { amount, sender_name: senderName, payment_method: 'bank_transfer', proof_ref: proofRef }
       });
-      if (afrstarEnabled) {
-        const checkout = new URL(response?.pay_url || '');
-        if (checkout.protocol !== 'https:') throw new Error('AfrStar returned an invalid checkout URL.');
-        result.innerHTML = '<div class="card card-pad" style="margin-top:14px" role="status"><strong>Opening AfrStar secure checkout…</strong><p class="small muted">Do not refresh or submit a second payment while checkout opens.</p></div>';
-        window.location.assign(checkout.toString());
-        return;
-      }
       const requestId = response?.deposit?.id ?? response?.id ?? response?.request_id ?? response?.reference;
       result.innerHTML = `<div class="card card-pad" style="margin-top:14px" role="status"><strong>Deposit request submitted for review</strong><p class="small muted" style="margin:6px 0 0">Your request is pending review; no funds have been credited yet.${requestId ? `<br>Reference: ${escapeHTML(requestId)}` : ''}</p></div>`;
       UI.toast('Deposit request submitted for review.','ok');
@@ -132,17 +121,9 @@ async function load() {
     const response = await apiRequest('/api/wallet?action=getBalance');
     const balance = safeNumber(response?.balance);
     if (balance === null) throw new Error('The wallet service returned an invalid balance.');
-    let afrstarEnabled = false;
-    try {
-      const paymentConfig = await apiRequest('/api/wallet?action=getPaymentConfig');
-      afrstarEnabled = paymentConfig?.afrstar_enabled === true;
-    } catch (_) {
-      // Keep manual deposits available if the gateway configuration endpoint is unavailable.
-    }
-    const rendered = render(balance, afrstarEnabled);
-    if (new URLSearchParams(window.location.search).get('payment') === 'return') {
-      rendered.result.innerHTML = '<div class="card card-pad" style="margin-top:14px" role="status"><strong>Payment confirmation pending</strong><p class="small muted">Your wallet updates only after AfrStar sends a verified callback. Check your wallet history shortly.</p></div>';
-    }
+    let paymentConfig = {};
+    try { paymentConfig = await apiRequest('/api/wallet?action=getPaymentConfig'); } catch (_) {}
+    render(balance, paymentConfig);
   } catch (error) {
     showPageError(app, error, load);
     app.dataset.liveReady = 'true';
